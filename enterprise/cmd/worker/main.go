@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/sourcegraph/sourcegraph/enterprise/cmd/worker/internal/insights"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/sourcegraph/sourcegraph/internal/conf"
 	"github.com/sourcegraph/sourcegraph/internal/database"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/versions"
+	"github.com/sourcegraph/sourcegraph/internal/repos"
 )
 
 func main() {
@@ -24,14 +28,27 @@ func main() {
 		log.Println("enterprise edition")
 	}
 
+	db, err := shared.InitDatabase()
+	if err != nil {
+		panic("asdf")
+	}
+
+	store := repos.NewStore(db, sql.TxOptions{Isolation: sql.LevelDefault})
+	{
+		m := repos.NewStoreMetrics()
+		m.MustRegister(prometheus.DefaultRegisterer)
+		store.Metrics = m
+	}
+
 	go setAuthzProviders()
 
 	shared.Start(map[string]shared.Job{
-		"codeintel-commitgraph":    codeintel.NewCommitGraphJob(),
-		"codeintel-janitor":        codeintel.NewJanitorJob(),
-		"codeintel-auto-indexing":  codeintel.NewIndexingJob(),
-		"codehost-version-syncing": versions.NewSyncingJob(),
-		"insights-job":             insights.NewInsightsJob(),
+		"codeintel-commitgraph":           codeintel.NewCommitGraphJob(),
+		"codeintel-janitor":               codeintel.NewJanitorJob(),
+		"codeintel-auto-indexing":         codeintel.NewIndexingJob(),
+		"codeintel-dependency-repo-adder": codeintel.NewDependencyRepoAddingJob(),
+		"codehost-version-syncing":        versions.NewSyncingJob(store),
+		"insights-job":                    insights.NewInsightsJob(),
 	})
 }
 

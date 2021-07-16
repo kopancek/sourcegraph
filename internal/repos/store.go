@@ -15,6 +15,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/opentracing/opentracing-go"
 	otlog "github.com/opentracing/opentracing-go/log"
+
 	"github.com/sourcegraph/sourcegraph/internal/api"
 	"github.com/sourcegraph/sourcegraph/internal/database"
 	"github.com/sourcegraph/sourcegraph/internal/database/basestore"
@@ -582,6 +583,41 @@ func scanJobs(rows *sql.Rows) ([]SyncJob, error) {
 	}
 
 	return jobs, nil
+}
+
+const getJVMDependencyReposQuery = `
+SELECT identifier, version FROM codeintel_dependency_repos
+WHERE scheme = 'semanticdb'
+`
+
+func (s *Store) GetJVMDependencyRepos(ctx context.Context) ([]JVMDependencyRepo, error) {
+	rows, err := s.Query(ctx, sqlf.Sprintf(getJVMDependencyReposQuery))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanJVMDependencyRepo(rows)
+}
+
+func scanJVMDependencyRepo(rows *sql.Rows) ([]JVMDependencyRepo, error) {
+	var dependencies []JVMDependencyRepo
+
+	for rows.Next() {
+		var dep JVMDependencyRepo
+		if err := rows.Scan(
+			&dep.Identifier,
+			&dep.Version,
+		); err != nil {
+			return nil, err
+		}
+
+		dependencies = append(dependencies, dep)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return dependencies, nil
 }
 
 func metadataColumn(metadata interface{}) (msg json.RawMessage, err error) {

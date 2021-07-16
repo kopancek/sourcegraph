@@ -20,6 +20,7 @@ import (
 
 	"github.com/sourcegraph/sourcegraph/internal/conf/reposource"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/jvmpackages/coursier"
+	"github.com/sourcegraph/sourcegraph/internal/repos"
 	"github.com/sourcegraph/sourcegraph/internal/vcs"
 	"github.com/sourcegraph/sourcegraph/schema"
 )
@@ -35,7 +36,8 @@ const (
 )
 
 type JVMPackagesSyncer struct {
-	Config *schema.JVMPackagesConnection
+	Config  *schema.JVMPackagesConnection
+	DBStore repos.JVMPackagesRepoStore
 }
 
 var _ VCSSyncer = &JVMPackagesSyncer{}
@@ -175,6 +177,19 @@ func (s *JVMPackagesSyncer) packageDependencies(ctx context.Context, repoUrlPath
 			// they are already logged out in the `GetRepo` method
 			// in internal/repos/jvm_packages.go.
 		}
+	}
+
+	dbDeps, err := s.DBStore.GetJVMDependencyRepos(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, dep := range dbDeps {
+		dependency, err := reposource.ParseMavenDependency(dep.Identifier)
+		if err != nil {
+			continue
+		}
+		dependencies = append(dependencies, dependency)
 	}
 
 	if len(dependencies) == 0 {
