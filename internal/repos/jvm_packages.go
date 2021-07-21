@@ -106,6 +106,7 @@ func (s *JVMPackagesSource) GetRepo(ctx context.Context, artifactPath string) (*
 
 	dbDeps, err := s.dbStore.GetJVMDependencyRepos(ctx)
 	if err != nil {
+		return nil, err
 	}
 
 	for _, dep := range dbDeps {
