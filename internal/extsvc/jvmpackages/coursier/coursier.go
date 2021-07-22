@@ -102,5 +102,9 @@ func runCoursierCommand(ctx context.Context, config *schema.JVMPackagesConnectio
 		return nil, errors.Wrapf(err, "coursier command %q failed with stderr %q and stdout %q", cmd, stderr, &stdout)
 	}
 
+	if stdout.String() == "" {
+		return []string{}, nil
+	}
+
 	return strings.Split(strings.TrimSpace(stdout.String()), "\n"), nil
 }
