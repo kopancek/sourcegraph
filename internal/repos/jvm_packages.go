@@ -81,10 +81,20 @@ func (s *JVMPackagesSource) listDependentRepos(ctx context.Context, results chan
 	}
 
 	for _, dep := range dbDeps {
-		parsed, err := reposource.ParseMavenDependency(dep.Identifier)
+		parsed, err := reposource.ParseMavenDependency(dep.Identifier + ":" + dep.Version)
 		if err != nil {
 			continue
 		}
+
+		// We dont return anything that isnt resolvable here, to reduce logspam from gitserver. This codepath
+		// should be hit much less frequently than gitservers attempts to get packages, so there should be less
+		// logspam. This may no longer hold true if the extsvc syncs more often than gitserver would, but I
+		// don't foresee that happening (not soon at least).
+		if !coursier.Exists(ctx, s.config, parsed) {
+			log15.Warn("jvm package not resolvable from coursier", "package", parsed.CoursierSyntax())
+			continue
+		}
+
 		repo := s.makeRepo(parsed.MavenModule)
 		results <- SourceResult{
 			Source: s,
@@ -110,14 +120,12 @@ func (s *JVMPackagesSource) GetRepo(ctx context.Context, artifactPath string) (*
 	}
 
 	for _, dep := range dbDeps {
-		parsed, err := reposource.ParseMavenDependency(dep.Identifier)
+		parsed, err := reposource.ParseMavenDependency(dep.Identifier + ":" + dep.Version)
 		if err != nil {
 			continue
 		}
 		dependencies = append(dependencies, parsed)
 	}
-
-	fmt.Printf("ALL DEPS %+v\n", dependencies)
 
 	nonExistentDependencies := make([]reposource.MavenDependency, 0)
 	hasAtLeastOneValidDependency := false

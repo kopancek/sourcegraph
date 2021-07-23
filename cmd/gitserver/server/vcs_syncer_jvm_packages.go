@@ -185,12 +185,15 @@ func (s *JVMPackagesSyncer) packageDependencies(ctx context.Context, repoUrlPath
 	}
 
 	for _, dep := range dbDeps {
-		if module.MatchesDependencyString(dep.Identifier) {
+		if module.MatchesDependencyString(dep.Identifier + ":" + dep.Version) {
 			dependency, err := reposource.ParseMavenDependency(dep.Identifier + ":" + dep.Version)
 			if err != nil {
 				continue
 			}
-			dependencies = append(dependencies, dependency)
+
+			if coursier.Exists(ctx, s.Config, dependency) {
+				dependencies = append(dependencies, dependency)
+			}
 		}
 	}
 
