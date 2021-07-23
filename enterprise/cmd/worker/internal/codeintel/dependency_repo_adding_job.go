@@ -15,7 +15,6 @@ import (
 	"github.com/sourcegraph/sourcegraph/internal/env"
 	"github.com/sourcegraph/sourcegraph/internal/goroutine"
 	"github.com/sourcegraph/sourcegraph/internal/observation"
-	"github.com/sourcegraph/sourcegraph/internal/repoupdater"
 	"github.com/sourcegraph/sourcegraph/internal/trace"
 	"github.com/sourcegraph/sourcegraph/internal/workerutil"
 )
@@ -54,7 +53,6 @@ func (j *dependencyRepoAddingJob) Routines(ctx context.Context) ([]goroutine.Bac
 		dependencyrepos.NewDependencyRepoAdder(
 			dbStoreShim,
 			dbstore.WorkerutilDependencyRepoAddingJobStore(dbStore, observationContext),
-			repoupdater.DefaultClient,
 			time.Minute*1,
 			1,
 			metrics),

@@ -28,6 +28,9 @@ type MockDBStore struct {
 	// ReferencesForUploadFunc is an instance of a mock function object
 	// controlling the behavior of the method ReferencesForUpload.
 	ReferencesForUploadFunc *DBStoreReferencesForUploadFunc
+	// UpsertFunc is an instance of a mock function object controlling the
+	// behavior of the method Upsert.
+	UpsertFunc *DBStoreUpsertFunc
 }
 
 // NewMockDBStore creates a new mock of the DBStore interface. All methods
@@ -49,6 +52,11 @@ func NewMockDBStore() *MockDBStore {
 				return nil, nil
 			},
 		},
+		UpsertFunc: &DBStoreUpsertFunc{
+			defaultHook: func(context.Context, ...*types.ExternalService) error {
+				return nil
+			},
+		},
 	}
 }
 
@@ -64,6 +72,9 @@ func NewMockDBStoreFrom(i DBStore) *MockDBStore {
 		},
 		ReferencesForUploadFunc: &DBStoreReferencesForUploadFunc{
 			defaultHook: i.ReferencesForUpload,
+		},
+		UpsertFunc: &DBStoreUpsertFunc{
+			defaultHook: i.Upsert,
 		},
 	}
 }
@@ -395,6 +406,118 @@ func (c DBStoreReferencesForUploadFuncCall) Args() []interface{} {
 // invocation.
 func (c DBStoreReferencesForUploadFuncCall) Results() []interface{} {
 	return []interface{}{c.Result0, c.Result1}
+}
+
+// DBStoreUpsertFunc describes the behavior when the Upsert method of the
+// parent MockDBStore instance is invoked.
+type DBStoreUpsertFunc struct {
+	defaultHook func(context.Context, ...*types.ExternalService) error
+	hooks       []func(context.Context, ...*types.ExternalService) error
+	history     []DBStoreUpsertFuncCall
+	mutex       sync.Mutex
+}
+
+// Upsert delegates to the next hook function in the queue and stores the
+// parameter and result values of this invocation.
+func (m *MockDBStore) Upsert(v0 context.Context, v1 ...*types.ExternalService) error {
+	r0 := m.UpsertFunc.nextHook()(v0, v1...)
+	m.UpsertFunc.appendCall(DBStoreUpsertFuncCall{v0, v1, r0})
+	return r0
+}
+
+// SetDefaultHook sets function that is called when the Upsert method of the
+// parent MockDBStore instance is invoked and the hook queue is empty.
+func (f *DBStoreUpsertFunc) SetDefaultHook(hook func(context.Context, ...*types.ExternalService) error) {
+	f.defaultHook = hook
+}
+
+// PushHook adds a function to the end of hook queue. Each invocation of the
+// Upsert method of the parent MockDBStore instance invokes the hook at the
+// front of the queue and discards it. After the queue is empty, the default
+// hook function is invoked for any future action.
+func (f *DBStoreUpsertFunc) PushHook(hook func(context.Context, ...*types.ExternalService) error) {
+	f.mutex.Lock()
+	f.hooks = append(f.hooks, hook)
+	f.mutex.Unlock()
+}
+
+// SetDefaultReturn calls SetDefaultDefaultHook with a function that returns
+// the given values.
+func (f *DBStoreUpsertFunc) SetDefaultReturn(r0 error) {
+	f.SetDefaultHook(func(context.Context, ...*types.ExternalService) error {
+		return r0
+	})
+}
+
+// PushReturn calls PushDefaultHook with a function that returns the given
+// values.
+func (f *DBStoreUpsertFunc) PushReturn(r0 error) {
+	f.PushHook(func(context.Context, ...*types.ExternalService) error {
+		return r0
+	})
+}
+
+func (f *DBStoreUpsertFunc) nextHook() func(context.Context, ...*types.ExternalService) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	if len(f.hooks) == 0 {
+		return f.defaultHook
+	}
+
+	hook := f.hooks[0]
+	f.hooks = f.hooks[1:]
+	return hook
+}
+
+func (f *DBStoreUpsertFunc) appendCall(r0 DBStoreUpsertFuncCall) {
+	f.mutex.Lock()
+	f.history = append(f.history, r0)
+	f.mutex.Unlock()
+}
+
+// History returns a sequence of DBStoreUpsertFuncCall objects describing
+// the invocations of this function.
+func (f *DBStoreUpsertFunc) History() []DBStoreUpsertFuncCall {
+	f.mutex.Lock()
+	history := make([]DBStoreUpsertFuncCall, len(f.history))
+	copy(history, f.history)
+	f.mutex.Unlock()
+
+	return history
+}
+
+// DBStoreUpsertFuncCall is an object that describes an invocation of method
+// Upsert on an instance of MockDBStore.
+type DBStoreUpsertFuncCall struct {
+	// Arg0 is the value of the 1st argument passed to this method
+	// invocation.
+	Arg0 context.Context
+	// Arg1 is a slice containing the values of the variadic arguments
+	// passed to this method invocation.
+	Arg1 []*types.ExternalService
+	// Result0 is the value of the 1st result returned from this method
+	// invocation.
+	Result0 error
+}
+
+// Args returns an interface slice containing the arguments of this
+// invocation. The variadic slice argument is flattened in this array such
+// that one positional argument and three variadic arguments would result in
+// a slice of four, not two.
+func (c DBStoreUpsertFuncCall) Args() []interface{} {
+	trailing := []interface{}{}
+	for _, val := range c.Arg1 {
+		trailing = append(trailing, val)
+	}
+
+	return append([]interface{}{c.Arg0}, trailing...)
+}
+
+// Results returns an interface slice containing the results of this
+// invocation.
+func (c DBStoreUpsertFuncCall) Results() []interface{} {
+	return []interface{}{c.Result0}
 }
 
 // MockRepoUpdaterClient is a mock implementation of the RepoUpdaterClient
