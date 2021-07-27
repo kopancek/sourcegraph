@@ -4,17 +4,18 @@ import (
 	"strings"
 
 	"github.com/sourcegraph/sourcegraph/enterprise/internal/codeintel/stores/lsifstore"
+	"github.com/sourcegraph/sourcegraph/internal/extsvc"
 )
 
-var schemeToParser map[string]func(lsifstore.Package) (DependencyRepoInfo, error) = map[string]func(lsifstore.Package) (DependencyRepoInfo, error){
-	"semanticdb": parseJVMPackage,
+var transformerForScheme map[string]func(lsifstore.Package) (DependencyRepoInfo, string, error) = map[string]func(lsifstore.Package) (DependencyRepoInfo, string, error){
+	"semanticdb": transformJVMPackageReference,
 }
 
-func parseJVMPackage(packageReference lsifstore.Package) (DependencyRepoInfo, error) {
+func transformJVMPackageReference(packageReference lsifstore.Package) (DependencyRepoInfo, string, error) {
 	replaced := strings.ReplaceAll(strings.TrimPrefix(packageReference.Name, "maven/"), "/", ":")
 	return DependencyRepoInfo{
 		Scheme:     packageReference.Scheme,
 		Identifier: replaced,
 		Version:    packageReference.Version,
-	}, nil
+	}, extsvc.KindJVMPackages, nil
 }

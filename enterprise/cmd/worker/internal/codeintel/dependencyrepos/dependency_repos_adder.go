@@ -11,7 +11,6 @@ import (
 	"github.com/sourcegraph/sourcegraph/enterprise/internal/codeintel/stores/dbstore"
 	"github.com/sourcegraph/sourcegraph/internal/actor"
 	"github.com/sourcegraph/sourcegraph/internal/database"
-	"github.com/sourcegraph/sourcegraph/internal/extsvc"
 	"github.com/sourcegraph/sourcegraph/internal/workerutil"
 	"github.com/sourcegraph/sourcegraph/internal/workerutil/dbworker"
 	dbworkerstore "github.com/sourcegraph/sourcegraph/internal/workerutil/dbworker/store"
@@ -61,9 +60,12 @@ func (h *dependencyRepoAddingHandler) Handle(ctx context.Context, record workeru
 		}
 	}()
 
-	var dependencies []dbstore.DependencyRepoInfo
+	var (
+		dependencies []dbstore.DependencyRepoInfo
+		kinds        []string
+		errs         []error
+	)
 
-	var errs []error
 	for {
 		packageReference, exists, err := scanner.Next()
 		if err != nil {
@@ -73,15 +75,19 @@ func (h *dependencyRepoAddingHandler) Handle(ctx context.Context, record workeru
 			break
 		}
 
-		parser, ok := schemeToParser[packageReference.Scheme]
+		transformer, ok := transformerForScheme[packageReference.Scheme]
 		if !ok {
 			return &ReferenceSchemeError{Scheme: packageReference.Scheme}
 		}
 
-		result, err := parser(packageReference.Package)
+		result, kind, err := transformer(packageReference.Package)
 		if err != nil {
 			errs = append(errs, errors.Wrap(err, fmt.Sprintf("dependencyrepo.PackageInformationParser: failed to parse package information data %#v", packageReference)))
 			continue
+		}
+
+		if !kindExists(kinds, kind) {
+			kinds = append(kinds, kind)
 		}
 
 		dependencies = append(dependencies, dbstore.DependencyRepoInfo{
@@ -100,7 +106,7 @@ func (h *dependencyRepoAddingHandler) Handle(ctx context.Context, record workeru
 	}
 
 	externalServices, err := h.dbStore.ListExternalServices(ctx, database.ExternalServicesListOptions{
-		Kinds: []string{extsvc.KindJVMPackages},
+		Kinds: kinds,
 	})
 	if err != nil {
 		return errors.Wrap(err, "dbstore.List")
@@ -109,11 +115,20 @@ func (h *dependencyRepoAddingHandler) Handle(ctx context.Context, record workeru
 	for _, externalService := range externalServices {
 		externalService.NextSyncAt = time.Now()
 		if err := h.dbStore.Upsert(ctx, externalService); err != nil {
-			return errors.Wrap(err, "dbstore.Upsert")
+			return errors.Wrapf(err, "dbstore.Upsert: error setting next_sync_at for external service %d - %s", externalService.ID, externalService.DisplayName)
 		}
 	}
 
 	return err
+}
+
+func kindExists(kinds []string, kind string) bool {
+	for _, k := range kinds {
+		if k == kind {
+			return true
+		}
+	}
+	return false
 }
 
 type ReferenceSchemeError struct {
