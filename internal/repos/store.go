@@ -591,20 +591,18 @@ WHERE scheme = 'semanticdb'
 `
 
 func (s *Store) GetJVMDependencyRepos(ctx context.Context) ([]JVMDependencyRepo, error) {
-	rows, err := s.Query(ctx, sqlf.Sprintf(getJVMDependencyReposQuery))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanJVMDependencyRepo(rows)
+	return scanJVMDependencyRepo(s.Query(ctx, sqlf.Sprintf(getJVMDependencyReposQuery)))
 }
 
-func scanJVMDependencyRepo(rows *sql.Rows) ([]JVMDependencyRepo, error) {
-	var dependencies []JVMDependencyRepo
+func scanJVMDependencyRepo(rows *sql.Rows, queryErr error) (dependencies []JVMDependencyRepo, err error) {
+	if queryErr != nil {
+		return nil, queryErr
+	}
+	defer func() { err = basestore.CloseRows(rows, err) }()
 
 	for rows.Next() {
 		var dep JVMDependencyRepo
-		if err := rows.Scan(
+		if err = rows.Scan(
 			&dep.Identifier,
 			&dep.Version,
 		); err != nil {
@@ -612,9 +610,6 @@ func scanJVMDependencyRepo(rows *sql.Rows) ([]JVMDependencyRepo, error) {
 		}
 
 		dependencies = append(dependencies, dep)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 
 	return dependencies, nil
