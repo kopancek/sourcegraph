@@ -151,13 +151,6 @@ func (h *handler) handle(ctx context.Context, upload store.Upload) (requeued boo
 			}
 
 			// Insert a companion record to this upload that will asynchronously trigger another worker to
-			// insert new external service repos based on the monikers written into the lsif_references table
-			// attached by this index processing job.
-			if _, err := tx.InsertDependencyRepoAddingJob(ctx, upload.ID); err != nil {
-				return errors.Wrap(err, "store.InsertDependencyRepoAddingJob")
-			}
-
-			// Insert a companion record to this upload that will asynchronously trigger another worker to
 			// queue auto-index records for the monikers written into the lsif_references table attached by
 			// this index processing job.
 			if _, err := tx.InsertDependencyIndexingJob(ctx, upload.ID); err != nil {

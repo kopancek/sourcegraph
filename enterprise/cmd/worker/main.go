@@ -43,12 +43,11 @@ func main() {
 	go setAuthzProviders()
 
 	shared.Start(map[string]shared.Job{
-		"codeintel-commitgraph":           codeintel.NewCommitGraphJob(),
-		"codeintel-janitor":               codeintel.NewJanitorJob(),
-		"codeintel-auto-indexing":         codeintel.NewIndexingJob(),
-		"codeintel-dependency-repo-adder": codeintel.NewDependencyRepoAddingJob(),
-		"codehost-version-syncing":        versions.NewSyncingJob(store),
-		"insights-job":                    insights.NewInsightsJob(),
+		"codeintel-commitgraph":    codeintel.NewCommitGraphJob(),
+		"codeintel-janitor":        codeintel.NewJanitorJob(),
+		"codeintel-auto-indexing":  codeintel.NewIndexingJob(),
+		"codehost-version-syncing": versions.NewSyncingJob(store),
+		"insights-job":             insights.NewInsightsJob(),
 	})
 }
 

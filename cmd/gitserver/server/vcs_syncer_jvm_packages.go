@@ -185,8 +185,14 @@ func (s *JVMPackagesSyncer) packageDependencies(ctx context.Context, repoUrlPath
 	}
 
 	for _, dep := range dbDeps {
-		if module.MatchesDependencyString(dep.Identifier + ":" + dep.Version) {
-			dependency, err := reposource.ParseMavenDependency(dep.Identifier + ":" + dep.Version)
+		parsedModule, err := reposource.ParseMavenModule(dep.Identifier)
+		if err != nil {
+			log15.Warn("error parsing maven module", "error", err, "module", dep.Identifier)
+			continue
+		}
+		fullDependencyString := parsedModule.SortText() + ":" + dep.Version
+		if module.MatchesDependencyString(fullDependencyString) {
+			dependency, err := reposource.ParseMavenDependency(fullDependencyString)
 			if err != nil {
 				continue
 			}

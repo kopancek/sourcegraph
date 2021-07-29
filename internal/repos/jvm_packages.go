@@ -81,7 +81,13 @@ func (s *JVMPackagesSource) listDependentRepos(ctx context.Context, results chan
 	}
 
 	for _, dep := range dbDeps {
-		parsed, err := reposource.ParseMavenDependency(dep.Identifier + ":" + dep.Version)
+		parsedModule, err := reposource.ParseMavenModule(dep.Identifier)
+		if err != nil {
+			log15.Warn("error parsing maven module", "error", err, "module", dep.Identifier)
+			continue
+		}
+		fullDependencyString := parsedModule.SortText() + ":" + dep.Version
+		parsed, err := reposource.ParseMavenDependency(fullDependencyString)
 		if err != nil {
 			continue
 		}
@@ -120,7 +126,13 @@ func (s *JVMPackagesSource) GetRepo(ctx context.Context, artifactPath string) (*
 	}
 
 	for _, dep := range dbDeps {
-		parsed, err := reposource.ParseMavenDependency(dep.Identifier + ":" + dep.Version)
+		parsedModule, err := reposource.ParseMavenModule(dep.Identifier)
+		if err != nil {
+			log15.Warn("error parsing maven module", "error", err, "module", dep.Identifier)
+			continue
+		}
+		fullDependencyString := parsedModule.SortText() + ":" + dep.Version
+		parsed, err := reposource.ParseMavenDependency(fullDependencyString)
 		if err != nil {
 			continue
 		}
