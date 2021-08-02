@@ -9,6 +9,7 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/hashicorp/go-multierror"
 
+	"github.com/sourcegraph/sourcegraph/internal/database/dbutil"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/auth"
 	"github.com/sourcegraph/sourcegraph/internal/httpcli"
@@ -26,7 +27,7 @@ type Sourcer func(...*types.ExternalService) (Sources, error)
 // Deleted external services are ignored.
 //
 // The provided decorator functions will be applied to each Source.
-func NewSourcer(cf *httpcli.Factory, db *Store, decs ...func(Source) Source) Sourcer {
+func NewSourcer(cf *httpcli.Factory, decs ...func(Source) Source) Sourcer {
 	return func(svcs ...*types.ExternalService) (Sources, error) {
 		srcs := make([]Source, 0, len(svcs))
 		var errs *multierror.Error
@@ -36,7 +37,7 @@ func NewSourcer(cf *httpcli.Factory, db *Store, decs ...func(Source) Source) Sou
 				continue
 			}
 
-			src, err := NewSource(svc, cf, db)
+			src, err := NewSource(svc, cf)
 			if err != nil {
 				errs = multierror.Append(errs, &SourceError{Err: err, ExtSvc: svc})
 				continue
@@ -54,7 +55,7 @@ func NewSourcer(cf *httpcli.Factory, db *Store, decs ...func(Source) Source) Sou
 }
 
 // NewSource returns a repository yielding Source from the given ExternalService configuration.
-func NewSource(svc *types.ExternalService, cf *httpcli.Factory, db *Store) (Source, error) {
+func NewSource(svc *types.ExternalService, cf *httpcli.Factory) (Source, error) {
 	switch strings.ToUpper(svc.Kind) {
 	case extsvc.KindGitHub:
 		return NewGithubSource(svc, cf)
@@ -73,7 +74,7 @@ func NewSource(svc *types.ExternalService, cf *httpcli.Factory, db *Store) (Sour
 	case extsvc.KindPerforce:
 		return NewPerforceSource(svc)
 	case extsvc.KindJVMPackages:
-		return NewJVMPackagesSource(svc, db)
+		return NewJVMPackagesSource(svc)
 	case extsvc.KindOther:
 		return NewOtherSource(svc, cf)
 	default:
@@ -89,6 +90,23 @@ type Source interface {
 	ListRepos(context.Context, chan SourceResult)
 	// ExternalServices returns the ExternalServices for the Source.
 	ExternalServices() types.ExternalServices
+}
+
+type DBSource interface {
+	Source
+	SetDB(dbutil.DB)
+}
+
+// WithDB returns a decorator used in NewSourcer that calls SetDB on Sources that
+// can be upgraded to it.
+func WithDB(db dbutil.DB) func(Source) Source {
+	return func(src Source) Source {
+		if s, ok := src.(DBSource); ok {
+			s.SetDB(db)
+			return s
+		}
+		return src
+	}
 }
 
 // A UserSource is a source that can use a custom authenticator (such as one

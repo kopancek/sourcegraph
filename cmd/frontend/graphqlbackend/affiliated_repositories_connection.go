@@ -82,7 +82,7 @@ func (a *affiliatedRepositoriesConnection) Nodes(ctx context.Context) ([]*codeHo
 
 		for _, svc := range svcs {
 			svcsByID[svc.ID] = svc
-			src, err := repos.NewSource(svc, cf, store)
+			src, err := repos.NewSource(svc, cf)
 			if err != nil {
 				a.err = err
 				return

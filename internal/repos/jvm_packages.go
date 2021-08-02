@@ -2,12 +2,14 @@ package repos
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/inconshreveable/log15"
 
 	"github.com/sourcegraph/sourcegraph/internal/api"
 	"github.com/sourcegraph/sourcegraph/internal/conf/reposource"
+	"github.com/sourcegraph/sourcegraph/internal/database/dbutil"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/jvmpackages"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/jvmpackages/coursier"
@@ -34,19 +36,23 @@ type JVMDependencyRepo struct {
 
 // NewJVMPackagesSource returns a new MavenSource from the given external
 // service.
-func NewJVMPackagesSource(svc *types.ExternalService, dbStore JVMPackagesRepoStore) (*JVMPackagesSource, error) {
+func NewJVMPackagesSource(svc *types.ExternalService) (*JVMPackagesSource, error) {
 	var c schema.JVMPackagesConnection
 	if err := jsonc.Unmarshal(svc.Config, &c); err != nil {
 		return nil, fmt.Errorf("external service id=%d config error: %s", svc.ID, err)
 	}
-	return newJVMPackagesSource(svc, &c, dbStore)
+	return newJVMPackagesSource(svc, &c)
 }
 
-func newJVMPackagesSource(svc *types.ExternalService, c *schema.JVMPackagesConnection, dbStore JVMPackagesRepoStore) (*JVMPackagesSource, error) {
+func (s *JVMPackagesSource) SetDB(db dbutil.DB) {
+	s.dbStore = NewStore(db, sql.TxOptions{})
+}
+
+func newJVMPackagesSource(svc *types.ExternalService, c *schema.JVMPackagesConnection) (*JVMPackagesSource, error) {
 	return &JVMPackagesSource{
 		svc:     svc,
 		config:  c,
-		dbStore: dbStore,
+		dbStore: nil, // set via SetDB decorator
 	}, nil
 }
 
@@ -86,22 +92,18 @@ func (s *JVMPackagesSource) listDependentRepos(ctx context.Context, results chan
 			log15.Warn("error parsing maven module", "error", err, "module", dep.Identifier)
 			continue
 		}
-		fullDependencyString := parsedModule.SortText() + ":" + dep.Version
-		parsed, err := reposource.ParseMavenDependency(fullDependencyString)
-		if err != nil {
-			continue
-		}
+		mavenDependency := reposource.MavenDependency{MavenModule: parsedModule, Version: dep.Version}
 
 		// We dont return anything that isnt resolvable here, to reduce logspam from gitserver. This codepath
 		// should be hit much less frequently than gitservers attempts to get packages, so there should be less
 		// logspam. This may no longer hold true if the extsvc syncs more often than gitserver would, but I
 		// don't foresee that happening (not soon at least).
-		if !coursier.Exists(ctx, s.config, parsed) {
-			log15.Warn("jvm package not resolvable from coursier", "package", parsed.CoursierSyntax())
+		if !coursier.Exists(ctx, s.config, mavenDependency) {
+			log15.Warn("jvm package not resolvable from coursier", "package", mavenDependency.CoursierSyntax())
 			continue
 		}
 
-		repo := s.makeRepo(parsed.MavenModule)
+		repo := s.makeRepo(mavenDependency.MavenModule)
 		results <- SourceResult{
 			Source: s,
 			Repo:   repo,

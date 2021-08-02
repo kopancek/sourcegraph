@@ -586,7 +586,7 @@ func scanJobs(rows *sql.Rows) ([]SyncJob, error) {
 }
 
 const getJVMDependencyReposQuery = `
-SELECT identifier, version FROM codeintel_dependency_repos
+SELECT name, version FROM lsif_dependency_repos
 WHERE scheme = 'semanticdb'
 `
 

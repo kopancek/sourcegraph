@@ -78,12 +78,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialize database stores: %v", err)
 	}
-	repoStore := database.Repos(db)
-	store := repos.NewStore(db, sql.TxOptions{Isolation: sql.LevelDefault})
+
+	repoStore := repos.NewStore(db, sql.TxOptions{Isolation: sql.LevelDefault})
 	{
 		m := repos.NewStoreMetrics()
 		m.MustRegister(prometheus.DefaultRegisterer)
-		store.Metrics = m
+		repoStore.Metrics = m
 	}
 	externalServiceStore := database.ExternalServices(db)
 
@@ -96,7 +96,7 @@ func main() {
 		ReposDir:           reposDir,
 		DesiredPercentFree: wantPctFree2,
 		GetRemoteURLFunc: func(ctx context.Context, repo api.RepoName) (string, error) {
-			r, err := repoStore.GetByName(ctx, repo)
+			r, err := repoStore.RepoStore.GetByName(ctx, repo)
 			if err != nil {
 				return "", err
 			}
@@ -114,7 +114,7 @@ func main() {
 			return "", errors.Errorf("no sources for %q", repo)
 		},
 		GetVCSSyncer: func(ctx context.Context, repo api.RepoName) (server.VCSSyncer, error) {
-			r, err := repoStore.GetByName(ctx, repo)
+			r, err := repoStore.RepoStore.GetByName(ctx, repo)
 			if err != nil {
 				return nil, errors.Wrap(err, "get repository")
 			}
@@ -162,7 +162,7 @@ func main() {
 					break
 				}
 
-				return &server.JVMPackagesSyncer{Config: &c, DBStore: store}, nil
+				return &server.JVMPackagesSyncer{Config: &c /* , DBStore: repoStore */}, nil
 			}
 			return &server.GitRepoSyncer{}, nil
 		},

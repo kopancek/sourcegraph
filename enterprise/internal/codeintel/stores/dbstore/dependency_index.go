@@ -126,7 +126,7 @@ func (s *Store) InsertCloneableDependencyRepo(ctx context.Context, dependency se
 
 const insertCloneableDependencyRepoQuery = `
 -- source: enterprise/internal/codeintel/stores/dbstore/dependency_index.go:InsertCloneableDependencyRepo
-INSERT INTO codeintel_dependency_repos
+INSERT INTO lsif_dependency_repos
 VALUES (%s, %s, %s)
 ON CONFLICT DO NOTHING
 RETURNING 1

@@ -1,7 +1,7 @@
 
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS codeintel_dependency_repos (
+CREATE TABLE IF NOT EXISTS lsif_dependency_repos (
     name text NOT NULL,
     version text NOT NULL,
     scheme text NOT NULL,
