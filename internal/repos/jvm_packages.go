@@ -2,12 +2,12 @@ package repos
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/inconshreveable/log15"
 
 	"github.com/sourcegraph/sourcegraph/internal/api"
+	"github.com/sourcegraph/sourcegraph/internal/codeintel/stores/dbstore"
 	"github.com/sourcegraph/sourcegraph/internal/conf/reposource"
 	"github.com/sourcegraph/sourcegraph/internal/database/dbutil"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc"
@@ -27,11 +27,7 @@ type JVMPackagesSource struct {
 }
 
 type JVMPackagesRepoStore interface {
-	GetJVMDependencyRepos(ctx context.Context) ([]JVMDependencyRepo, error)
-}
-
-type JVMDependencyRepo struct {
-	Identifier, Version string
+	GetJVMDependencyRepos(ctx context.Context, filter dbstore.GetJVMDependencyReposOpts) ([]dbstore.JVMDependencyRepo, error)
 }
 
 // NewJVMPackagesSource returns a new MavenSource from the given external
@@ -45,7 +41,8 @@ func NewJVMPackagesSource(svc *types.ExternalService) (*JVMPackagesSource, error
 }
 
 func (s *JVMPackagesSource) SetDB(db dbutil.DB) {
-	s.dbStore = NewStore(db, sql.TxOptions{})
+	// TODO: set metrics and obsv ctx
+	s.dbStore = dbstore.NewWithDB(db, nil, nil)
 }
 
 func newJVMPackagesSource(svc *types.ExternalService, c *schema.JVMPackagesConnection) (*JVMPackagesSource, error) {
@@ -80,33 +77,45 @@ func (s *JVMPackagesSource) listDependentRepos(ctx context.Context, results chan
 		return
 	}
 
-	dbDeps, err := s.dbStore.GetJVMDependencyRepos(ctx)
-	if err != nil {
-		results <- SourceResult{Err: err}
-		return
-	}
-
-	for _, dep := range dbDeps {
-		parsedModule, err := reposource.ParseMavenModule(dep.Identifier)
+	lastID := 0
+	for {
+		dbDeps, err := s.dbStore.GetJVMDependencyRepos(ctx, dbstore.GetJVMDependencyReposOpts{
+			After: lastID,
+			Limit: 100,
+		})
 		if err != nil {
-			log15.Warn("error parsing maven module", "error", err, "module", dep.Identifier)
-			continue
-		}
-		mavenDependency := reposource.MavenDependency{MavenModule: parsedModule, Version: dep.Version}
-
-		// We dont return anything that isnt resolvable here, to reduce logspam from gitserver. This codepath
-		// should be hit much less frequently than gitservers attempts to get packages, so there should be less
-		// logspam. This may no longer hold true if the extsvc syncs more often than gitserver would, but I
-		// don't foresee that happening (not soon at least).
-		if !coursier.Exists(ctx, s.config, mavenDependency) {
-			log15.Warn("jvm package not resolvable from coursier", "package", mavenDependency.CoursierSyntax())
-			continue
+			results <- SourceResult{Err: err}
+			return
 		}
 
-		repo := s.makeRepo(mavenDependency.MavenModule)
-		results <- SourceResult{
-			Source: s,
-			Repo:   repo,
+		if len(dbDeps) == 0 {
+			break
+		}
+
+		lastID = dbDeps[len(dbDeps)-1].ID
+
+		for _, dep := range dbDeps {
+			parsedModule, err := reposource.ParseMavenModule(dep.Module)
+			if err != nil {
+				log15.Warn("error parsing maven module", "error", err, "module", dep.Module)
+				continue
+			}
+			mavenDependency := reposource.MavenDependency{MavenModule: parsedModule, Version: dep.Version}
+
+			// We dont return anything that isnt resolvable here, to reduce logspam from gitserver. This codepath
+			// should be hit much less frequently than gitservers attempts to get packages, so there should be less
+			// logspam. This may no longer hold true if the extsvc syncs more often than gitserver would, but I
+			// don't foresee that happening (not soon at least).
+			if !coursier.Exists(ctx, s.config, mavenDependency) {
+				log15.Warn("jvm package not resolvable from coursier", "package", mavenDependency.CoursierSyntax())
+				continue
+			}
+
+			repo := s.makeRepo(mavenDependency.MavenModule)
+			results <- SourceResult{
+				Source: s,
+				Repo:   repo,
+			}
 		}
 	}
 }
@@ -122,18 +131,25 @@ func (s *JVMPackagesSource) GetRepo(ctx context.Context, artifactPath string) (*
 		return nil, err
 	}
 
-	dbDeps, err := s.dbStore.GetJVMDependencyRepos(ctx)
+	// TODO: is artifactPath in the format we expect
+	log15.Info("ARTIFACT PATH", "path", artifactPath)
+	dbDeps, err := s.dbStore.GetJVMDependencyRepos(ctx, dbstore.GetJVMDependencyReposOpts{
+		ArtifactName: artifactPath,
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	for _, dep := range dbDeps {
-		parsedModule, err := reposource.ParseMavenModule(dep.Identifier)
+		parsedModule, err := reposource.ParseMavenModule(dep.Module)
 		if err != nil {
-			log15.Warn("error parsing maven module", "error", err, "module", dep.Identifier)
+			log15.Warn("error parsing maven module", "error", err, "module", dep.Module)
 			continue
 		}
-		fullDependencyString := parsedModule.SortText() + ":" + dep.Version
+		fullDependencyString := reposource.MavenDependency{
+			MavenModule: parsedModule,
+			Version:     dep.Version,
+		}.CoursierSyntax()
 		parsed, err := reposource.ParseMavenDependency(fullDependencyString)
 		if err != nil {
 			continue

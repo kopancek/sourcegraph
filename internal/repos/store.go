@@ -585,36 +585,6 @@ func scanJobs(rows *sql.Rows) ([]SyncJob, error) {
 	return jobs, nil
 }
 
-const getJVMDependencyReposQuery = `
-SELECT name, version FROM lsif_dependency_repos
-WHERE scheme = 'semanticdb'
-`
-
-func (s *Store) GetJVMDependencyRepos(ctx context.Context) ([]JVMDependencyRepo, error) {
-	return scanJVMDependencyRepo(s.Query(ctx, sqlf.Sprintf(getJVMDependencyReposQuery)))
-}
-
-func scanJVMDependencyRepo(rows *sql.Rows, queryErr error) (dependencies []JVMDependencyRepo, err error) {
-	if queryErr != nil {
-		return nil, queryErr
-	}
-	defer func() { err = basestore.CloseRows(rows, err) }()
-
-	for rows.Next() {
-		var dep JVMDependencyRepo
-		if err = rows.Scan(
-			&dep.Identifier,
-			&dep.Version,
-		); err != nil {
-			return nil, err
-		}
-
-		dependencies = append(dependencies, dep)
-	}
-
-	return dependencies, nil
-}
-
 func metadataColumn(metadata interface{}) (msg json.RawMessage, err error) {
 	switch m := metadata.(type) {
 	case nil:

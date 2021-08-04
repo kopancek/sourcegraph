@@ -2,14 +2,12 @@ package graphqlbackend
 
 import (
 	"context"
-	"database/sql"
 	"sort"
 	"strings"
 	"sync"
 
 	"github.com/cockroachdb/errors"
 	"github.com/inconshreveable/log15"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/sourcegraph/sourcegraph/internal/conf"
 	"github.com/sourcegraph/sourcegraph/internal/database"
@@ -72,13 +70,6 @@ func (a *affiliatedRepositoriesConnection) Nodes(ctx context.Context) ([]*codeHo
 			svcsByID = make(map[int64]*types.ExternalService)
 			pending  int
 		)
-
-		store := repos.NewStore(a.db, sql.TxOptions{Isolation: sql.LevelDefault})
-		{
-			m := repos.NewStoreMetrics()
-			m.MustRegister(prometheus.DefaultRegisterer)
-			store.Metrics = m
-		}
 
 		for _, svc := range svcs {
 			svcsByID[svc.ID] = svc

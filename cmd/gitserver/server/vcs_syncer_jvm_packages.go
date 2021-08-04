@@ -18,6 +18,7 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/inconshreveable/log15"
 
+	"github.com/sourcegraph/sourcegraph/internal/codeintel/stores/dbstore"
 	"github.com/sourcegraph/sourcegraph/internal/conf/reposource"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/jvmpackages/coursier"
 	"github.com/sourcegraph/sourcegraph/internal/repos"
@@ -179,18 +180,25 @@ func (s *JVMPackagesSyncer) packageDependencies(ctx context.Context, repoUrlPath
 		}
 	}
 
-	dbDeps, err := s.dbStore.GetJVMDependencyRepos(ctx)
+	// TODO: is repoUrlPath in the format we expect
+	log15.Info("REPO URL PATH", "path", repoUrlPath)
+	dbDeps, err := s.dbStore.GetJVMDependencyRepos(ctx, dbstore.GetJVMDependencyReposOpts{
+		ArtifactName: repoUrlPath,
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	for _, dep := range dbDeps {
-		parsedModule, err := reposource.ParseMavenModule(dep.Identifier)
+		parsedModule, err := reposource.ParseMavenModule(dep.Module)
 		if err != nil {
-			log15.Warn("error parsing maven module", "error", err, "module", dep.Identifier)
+			log15.Warn("error parsing maven module", "error", err, "module", dep.Module)
 			continue
 		}
-		fullDependencyString := parsedModule.SortText() + ":" + dep.Version
+		fullDependencyString := reposource.MavenDependency{
+			MavenModule: parsedModule,
+			Version:     dep.Version,
+		}.CoursierSyntax()
 		if module.MatchesDependencyString(fullDependencyString) {
 			dependency, err := reposource.ParseMavenDependency(fullDependencyString)
 			if err != nil {

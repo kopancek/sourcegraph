@@ -13,8 +13,8 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/sourcegraph/sourcegraph/internal/codeintel/stores/dbstore"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/jvmpackages/coursier"
-	"github.com/sourcegraph/sourcegraph/internal/repos"
 	"github.com/sourcegraph/sourcegraph/internal/vcs"
 	"github.com/sourcegraph/sourcegraph/schema"
 )
@@ -196,6 +196,6 @@ func TestJVMCloneCommand(t *testing.T) {
 
 type simpleJVMPackageDBStoreMock struct{}
 
-func (m *simpleJVMPackageDBStoreMock) GetJVMDependencyRepos(ctx context.Context) ([]repos.JVMDependencyRepo, error) {
-	return []repos.JVMDependencyRepo{}, nil
+func (m *simpleJVMPackageDBStoreMock) GetJVMDependencyRepos(ctx context.Context, filter dbstore.GetJVMDependencyReposOpts) ([]dbstore.JVMDependencyRepo, error) {
+	return []dbstore.JVMDependencyRepo{}, nil
 }

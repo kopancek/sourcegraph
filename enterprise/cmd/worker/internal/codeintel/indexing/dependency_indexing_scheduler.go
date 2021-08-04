@@ -155,7 +155,7 @@ func (h *dependencyIndexingSchedulerHandler) Handle(ctx context.Context, record 
 
 // shouldIndexDependencies returns true if the given upload should undergo dependency
 // indexing. Currently, we're only enabling dependency indexing for a repositories that
-// were indexed via lsif-go and maven repositories.
+// were indexed via lsif-go and lsif-java.
 func (h *dependencyIndexingSchedulerHandler) shouldIndexDependencies(ctx context.Context, store DBStore, uploadID int) (bool, error) {
 	upload, _, err := store.GetUploadByID(ctx, uploadID)
 	if err != nil {

@@ -65,19 +65,19 @@ func SortDependencies(dependencies []MavenDependency) {
 	})
 }
 
-func (d *MavenDependency) IsJdk() bool {
+func (d MavenDependency) IsJdk() bool {
 	return d.MavenModule.IsJdk()
 }
 
-func (d *MavenDependency) CoursierSyntax() string {
+func (d MavenDependency) CoursierSyntax() string {
 	return fmt.Sprintf("%s:%s:%s", d.MavenModule.GroupID, d.MavenModule.ArtifactID, d.Version)
 }
 
-func (d *MavenDependency) GitTagFromVersion() string {
+func (d MavenDependency) GitTagFromVersion() string {
 	return "v" + d.Version
 }
 
-func (m *MavenDependency) LsifJavaDependencies() []string {
+func (m MavenDependency) LsifJavaDependencies() []string {
 	if m.IsJdk() {
 		return []string{}
 	}
