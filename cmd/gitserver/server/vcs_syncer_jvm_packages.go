@@ -38,7 +38,7 @@ const (
 
 type JVMPackagesSyncer struct {
 	Config  *schema.JVMPackagesConnection
-	dbStore repos.JVMPackagesRepoStore
+	DBStore repos.JVMPackagesRepoStore
 }
 
 var _ VCSSyncer = &JVMPackagesSyncer{}
@@ -182,7 +182,7 @@ func (s *JVMPackagesSyncer) packageDependencies(ctx context.Context, repoUrlPath
 
 	// TODO: is repoUrlPath in the format we expect
 	log15.Info("REPO URL PATH", "path", repoUrlPath)
-	dbDeps, err := s.dbStore.GetJVMDependencyRepos(ctx, dbstore.GetJVMDependencyReposOpts{
+	dbDeps, err := s.DBStore.GetJVMDependencyRepos(ctx, dbstore.GetJVMDependencyReposOpts{
 		ArtifactName: repoUrlPath,
 	})
 	if err != nil {

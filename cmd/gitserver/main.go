@@ -3,7 +3,6 @@ package main // import "github.com/sourcegraph/sourcegraph/cmd/gitserver"
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"net"
 	"net/http"
@@ -15,11 +14,13 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/inconshreveable/log15"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/sourcegraph/sourcegraph/cmd/gitserver/server"
 	"github.com/sourcegraph/sourcegraph/internal/api"
 	"github.com/sourcegraph/sourcegraph/internal/authz"
+	codeinteldbstore "github.com/sourcegraph/sourcegraph/internal/codeintel/stores/dbstore"
 	"github.com/sourcegraph/sourcegraph/internal/conf"
 	"github.com/sourcegraph/sourcegraph/internal/database"
 	"github.com/sourcegraph/sourcegraph/internal/database/dbconn"
@@ -31,6 +32,7 @@ import (
 	"github.com/sourcegraph/sourcegraph/internal/hostname"
 	"github.com/sourcegraph/sourcegraph/internal/jsonc"
 	"github.com/sourcegraph/sourcegraph/internal/logging"
+	"github.com/sourcegraph/sourcegraph/internal/observation"
 	"github.com/sourcegraph/sourcegraph/internal/profiler"
 	"github.com/sourcegraph/sourcegraph/internal/repos"
 	"github.com/sourcegraph/sourcegraph/internal/trace"
@@ -79,12 +81,12 @@ func main() {
 		log.Fatalf("failed to initialize database stores: %v", err)
 	}
 
-	repoStore := repos.NewStore(db, sql.TxOptions{Isolation: sql.LevelDefault})
-	{
-		m := repos.NewStoreMetrics()
-		m.MustRegister(prometheus.DefaultRegisterer)
-		repoStore.Metrics = m
-	}
+	repoStore := database.Repos(db)
+	codeintelDb := codeinteldbstore.NewWithDB(db, &observation.Context{
+		Logger:     log15.Root(),
+		Tracer:     &trace.Tracer{Tracer: opentracing.GlobalTracer()},
+		Registerer: prometheus.DefaultRegisterer,
+	}, nil)
 	externalServiceStore := database.ExternalServices(db)
 
 	err = keyring.Init(ctx)
@@ -96,7 +98,7 @@ func main() {
 		ReposDir:           reposDir,
 		DesiredPercentFree: wantPctFree2,
 		GetRemoteURLFunc: func(ctx context.Context, repo api.RepoName) (string, error) {
-			r, err := repoStore.RepoStore.GetByName(ctx, repo)
+			r, err := repoStore.GetByName(ctx, repo)
 			if err != nil {
 				return "", err
 			}
@@ -114,7 +116,7 @@ func main() {
 			return "", errors.Errorf("no sources for %q", repo)
 		},
 		GetVCSSyncer: func(ctx context.Context, repo api.RepoName) (server.VCSSyncer, error) {
-			r, err := repoStore.RepoStore.GetByName(ctx, repo)
+			r, err := repoStore.GetByName(ctx, repo)
 			if err != nil {
 				return nil, errors.Wrap(err, "get repository")
 			}
@@ -162,7 +164,7 @@ func main() {
 					break
 				}
 
-				return &server.JVMPackagesSyncer{Config: &c /* , DBStore: repoStore */}, nil
+				return &server.JVMPackagesSyncer{Config: &c, DBStore: codeintelDb}, nil
 			}
 			return &server.GitRepoSyncer{}, nil
 		},

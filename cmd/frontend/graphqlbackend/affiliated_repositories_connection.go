@@ -18,7 +18,9 @@ import (
 	"github.com/sourcegraph/sourcegraph/internal/types"
 )
 
-var cf = httpcli.NewExternalHTTPClientFactory()
+var (
+	cf = httpcli.NewExternalHTTPClientFactory()
+)
 
 type affiliatedRepositoriesConnection struct {
 	userID   int32
@@ -70,7 +72,6 @@ func (a *affiliatedRepositoriesConnection) Nodes(ctx context.Context) ([]*codeHo
 			svcsByID = make(map[int64]*types.ExternalService)
 			pending  int
 		)
-
 		for _, svc := range svcs {
 			svcsByID[svc.ID] = svc
 			src, err := repos.NewSource(svc, cf)

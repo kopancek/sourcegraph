@@ -133,7 +133,7 @@ func TestJVMCloneCommand(t *testing.T) {
 
 	s := JVMPackagesSyncer{
 		Config:  &schema.JVMPackagesConnection{Maven: &schema.Maven{Dependencies: []string{}}},
-		dbStore: &simpleJVMPackageDBStoreMock{},
+		DBStore: &simpleJVMPackageDBStoreMock{},
 	}
 	bareGitDirectory := path.Join(dir, "git")
 
