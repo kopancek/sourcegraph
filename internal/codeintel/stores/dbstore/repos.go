@@ -74,6 +74,7 @@ func scanJVMDependencyRepo(rows *sql.Rows, queryErr error) (dependencies []JVMDe
 	for rows.Next() {
 		var dep JVMDependencyRepo
 		if err = rows.Scan(
+			&dep.ID,
 			&dep.Module,
 			&dep.Version,
 		); err != nil {
