@@ -97,6 +97,7 @@ func scanJVMDependencyRepo(rows *sql.Rows, queryErr error) (dependencies []JVMDe
 }
 
 const getLSIFDependencyReposQuery = `
+-- source: internal/codeintel/stores/dbstore/repos.go:GetLSIFDependencyRepos
 SELECT id, name, version FROM lsif_dependency_repos
 WHERE %s ORDER BY id %s
 `

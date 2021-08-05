@@ -66,10 +66,13 @@ func (h *dependencyIndexingSchedulerHandler) Handle(ctx context.Context, record 
 		return nil
 	}
 
+	var errs []error
+
 	job := record.(dbstore.DependencyIndexingJob)
 
-	if ok, err := h.shouldIndexDependencies(ctx, h.dbStore, job.UploadID); err != nil || !ok {
-		return err
+	shouldIndex, err := h.shouldIndexDependencies(ctx, h.dbStore, job.UploadID)
+	if err != nil {
+		errs = append(errs, errors.Wrap(err, "indexing.shouldIndexDependencies"))
 	}
 
 	scanner, err := h.dbStore.ReferencesForUpload(ctx, job.UploadID)
@@ -82,10 +85,7 @@ func (h *dependencyIndexingSchedulerHandler) Handle(ctx context.Context, record 
 		}
 	}()
 
-	var (
-		kinds []string
-		errs  []error
-	)
+	var kinds []string
 
 	for {
 		packageReference, exists, err := scanner.Next()
@@ -102,8 +102,10 @@ func (h *dependencyIndexingSchedulerHandler) Handle(ctx context.Context, record 
 			Version: packageReference.Package.Version,
 		}
 
-		if err := h.indexEnqueuer.QueueIndexesForPackage(ctx, pkg); err != nil {
-			errs = append(errs, errors.Wrap(err, "enqueuer.QueueIndexesForPackage"))
+		if shouldIndex {
+			if err := h.indexEnqueuer.QueueIndexesForPackage(ctx, pkg); err != nil {
+				errs = append(errs, errors.Wrap(err, "enqueuer.QueueIndexesForPackage"))
+			}
 		}
 
 		extsvcKind, ok := schemeToExternalService[packageReference.Scheme]
