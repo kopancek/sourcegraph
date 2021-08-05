@@ -45,21 +45,30 @@ type JVMDependencyRepo struct {
 	ID      int
 }
 
-func (s *Store) GetJVMDependencyRepos(ctx context.Context, filter GetJVMDependencyReposOpts) ([]JVMDependencyRepo, error) {
-	conds := []*sqlf.Query{sqlf.Sprintf("scheme = %s", "semanticdb")}
+func (s *Store) GetJVMDependencyRepos(ctx context.Context, filter GetJVMDependencyReposOpts) (repos []JVMDependencyRepo, err error) {
+	ctx, endObservation := s.operations.getJVMDependencies.With(ctx, &err, observation.Args{LogFields: []log.Field{
+		log.Int("after", filter.After),
+		log.Int("limit", filter.Limit),
+		log.Lazy(func(l log.Encoder) {
+			l.EmitInt("results", len(repos))
+		}),
+	}})
+	defer endObservation(1, observation.Args{})
 
-	var limit interface{} = "ALL"
-
-	if filter.ArtifactName != "" {
-		conds = append(conds, sqlf.Sprintf("name = %s", filter.ArtifactName))
-	}
+	conds := make([]*sqlf.Query, 0, 3)
+	conds = append(conds, sqlf.Sprintf("scheme = semanticdb"))
 
 	if filter.After > 0 {
 		conds = append(conds, sqlf.Sprintf("id > %d", filter.After))
 	}
 
+	if filter.ArtifactName != "" {
+		conds = append(conds, sqlf.Sprintf("name = %s", filter.ArtifactName))
+	}
+
+	limit := sqlf.Sprintf("")
 	if filter.Limit != 0 {
-		limit = filter.Limit
+		limit = sqlf.Sprintf("LIMIT %s", filter.Limit)
 	}
 
 	return scanJVMDependencyRepo(s.Query(ctx, sqlf.Sprintf(getLSIFDependencyReposQuery, sqlf.Join(conds, "AND"), limit)))
@@ -89,5 +98,5 @@ func scanJVMDependencyRepo(rows *sql.Rows, queryErr error) (dependencies []JVMDe
 
 const getLSIFDependencyReposQuery = `
 SELECT id, name, version FROM lsif_dependency_repos
-WHERE %s ORDER BY id LIMIT %v
+WHERE %s ORDER BY id %s
 `
