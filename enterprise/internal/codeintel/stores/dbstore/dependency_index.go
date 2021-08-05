@@ -116,17 +116,17 @@ func (s *Store) InsertCloneableDependencyRepo(ctx context.Context, dependency se
 	defer func() {
 		endObservation(1, observation.Args{LogFields: []log.Field{
 			log.Bool("new", new),
-			log.String("dependency", fmt.Sprint(dependency)),
+			log.Object("dependency", fmt.Sprint(dependency)),
 		}})
 	}()
 
-	_, new, err = basestore.ScanFirstInt(s.Store.Query(ctx, sqlf.Sprintf(insertCloneableDependencyRepoQuery, dependency.Name, dependency.Version, dependency.Scheme)))
+	_, new, err = basestore.ScanFirstInt(s.Store.Query(ctx, sqlf.Sprintf(insertCloneableDependencyRepoQuery, dependency.Scheme, dependency.Name, dependency.Version)))
 	return
 }
 
 const insertCloneableDependencyRepoQuery = `
 -- source: enterprise/internal/codeintel/stores/dbstore/dependency_index.go:InsertCloneableDependencyRepo
-INSERT INTO lsif_dependency_repos
+INSERT INTO lsif_dependency_repos (scheme, name, version)
 VALUES (%s, %s, %s)
 ON CONFLICT DO NOTHING
 RETURNING 1

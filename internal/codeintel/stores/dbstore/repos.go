@@ -56,7 +56,7 @@ func (s *Store) GetJVMDependencyRepos(ctx context.Context, filter GetJVMDependen
 	defer endObservation(1, observation.Args{})
 
 	conds := make([]*sqlf.Query, 0, 3)
-	conds = append(conds, sqlf.Sprintf("scheme = semanticdb"))
+	conds = append(conds, sqlf.Sprintf("scheme = 'semanticdb'"))
 
 	if filter.After > 0 {
 		conds = append(conds, sqlf.Sprintf("id > %d", filter.After))

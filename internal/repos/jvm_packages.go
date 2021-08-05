@@ -3,8 +3,11 @@ package repos
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/inconshreveable/log15"
+	"github.com/opentracing/opentracing-go"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/sourcegraph/sourcegraph/internal/api"
 	"github.com/sourcegraph/sourcegraph/internal/codeintel/stores/dbstore"
@@ -14,8 +17,17 @@ import (
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/jvmpackages"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/jvmpackages/coursier"
 	"github.com/sourcegraph/sourcegraph/internal/jsonc"
+	"github.com/sourcegraph/sourcegraph/internal/metrics"
+	"github.com/sourcegraph/sourcegraph/internal/observation"
+	"github.com/sourcegraph/sourcegraph/internal/trace"
 	"github.com/sourcegraph/sourcegraph/internal/types"
 	"github.com/sourcegraph/sourcegraph/schema"
+)
+
+var (
+	observationContext *observation.Context
+	operationMetrics   *metrics.OperationMetrics
+	once               sync.Once
 )
 
 // A JVMPackagesSource creates git repositories from `*-sources.jar` files of
@@ -41,8 +53,15 @@ func NewJVMPackagesSource(svc *types.ExternalService) (*JVMPackagesSource, error
 }
 
 func (s *JVMPackagesSource) SetDB(db dbutil.DB) {
-	// TODO: set metrics and obsv ctx
-	s.dbStore = dbstore.NewWithDB(db, nil, nil)
+	once.Do(func() {
+		observationContext = &observation.Context{
+			Logger:     log15.Root(),
+			Tracer:     &trace.Tracer{Tracer: opentracing.GlobalTracer()},
+			Registerer: prometheus.DefaultRegisterer,
+		}
+		operationMetrics = dbstore.NewOperationsMetrics(observationContext)
+	})
+	s.dbStore = dbstore.NewWithDB(db, observationContext, operationMetrics)
 }
 
 func newJVMPackagesSource(svc *types.ExternalService, c *schema.JVMPackagesConnection) (*JVMPackagesSource, error) {
