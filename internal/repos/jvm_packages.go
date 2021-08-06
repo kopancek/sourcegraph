@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/cockroachdb/errors"
 	"github.com/inconshreveable/log15"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
@@ -150,13 +151,11 @@ func (s *JVMPackagesSource) GetRepo(ctx context.Context, artifactPath string) (*
 		return nil, err
 	}
 
-	// TODO: is artifactPath in the format we expect
-	log15.Info("ARTIFACT PATH", "path", artifactPath)
 	dbDeps, err := s.dbStore.GetJVMDependencyRepos(ctx, dbstore.GetJVMDependencyReposOpts{
 		ArtifactName: artifactPath,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "dbstore.GetJVMDependencyRepos")
 	}
 
 	for _, dep := range dbDeps {

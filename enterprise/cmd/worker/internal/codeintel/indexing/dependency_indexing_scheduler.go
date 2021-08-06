@@ -122,7 +122,7 @@ func (h *dependencyIndexingSchedulerHandler) Handle(ctx context.Context, record 
 		}
 	}
 
-	// if len == 0, it will return all external services, which we definitely dont want
+	// If len == 0, it will return all external services, which we definitely don't want.
 	if len(kinds) > 0 {
 		externalServices, err := h.extsvcStore.List(ctx, database.ExternalServicesListOptions{
 			Kinds: kinds,

@@ -16,7 +16,7 @@ type MavenModule struct {
 	ArtifactID string
 }
 
-func (m *MavenModule) IsJdk() bool {
+func (m *MavenModule) IsJDK() bool {
 	return *m == jdkModule()
 }
 
@@ -29,14 +29,14 @@ func (m *MavenModule) SortText() string {
 }
 
 func (m *MavenModule) LsifJavaKind() string {
-	if m.IsJdk() {
+	if m.IsJDK() {
 		return "jdk"
 	}
 	return "maven"
 }
 
 func (m *MavenModule) RepoName() api.RepoName {
-	if m.IsJdk() {
+	if m.IsJDK() {
 		return "jdk"
 	}
 	return api.RepoName(fmt.Sprintf("maven/%s/%s", m.GroupID, m.ArtifactID))
@@ -65,8 +65,8 @@ func SortDependencies(dependencies []MavenDependency) {
 	})
 }
 
-func (d MavenDependency) IsJdk() bool {
-	return d.MavenModule.IsJdk()
+func (d MavenDependency) IsJDK() bool {
+	return d.MavenModule.IsJDK()
 }
 
 func (d MavenDependency) CoursierSyntax() string {
@@ -77,11 +77,11 @@ func (d MavenDependency) GitTagFromVersion() string {
 	return "v" + d.Version
 }
 
-func (m MavenDependency) LsifJavaDependencies() []string {
-	if m.IsJdk() {
+func (d MavenDependency) LsifJavaDependencies() []string {
+	if d.IsJDK() {
 		return []string{}
 	}
-	return []string{m.CoursierSyntax()}
+	return []string{d.CoursierSyntax()}
 }
 
 // ParseMavenDependency parses a dependency string in the Coursier format (colon seperated group ID, artifact ID and version)

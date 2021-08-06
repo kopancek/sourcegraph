@@ -203,7 +203,7 @@ func (s *JVMPackagesSyncer) packageDependencies(ctx context.Context, repoUrlPath
 				continue
 			}
 
-			// we dont call coursier.Exists here
+			// we dont call coursier.Exists here, as existance should be verified by repo-updater
 			dependencies = append(dependencies, dependency)
 		}
 	}
@@ -396,7 +396,7 @@ func copyZipFileEntry(reader *zip.ReadCloser, entry *zip.File, outputPath string
 // the bytecode in the given jar file.
 func inferJVMVersionFromByteCode(ctx context.Context, connection *schema.JVMPackagesConnection,
 	dependency reposource.MavenDependency) (string, error) {
-	if dependency.IsJdk() {
+	if dependency.IsJDK() {
 		return dependency.Version, nil
 	}
 

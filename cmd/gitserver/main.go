@@ -82,7 +82,7 @@ func main() {
 	}
 
 	repoStore := database.Repos(db)
-	codeintelDb := codeinteldbstore.NewWithDB(db, &observation.Context{
+	codeintelDB := codeinteldbstore.NewWithDB(db, &observation.Context{
 		Logger:     log15.Root(),
 		Tracer:     &trace.Tracer{Tracer: opentracing.GlobalTracer()},
 		Registerer: prometheus.DefaultRegisterer,
@@ -164,7 +164,7 @@ func main() {
 					break
 				}
 
-				return &server.JVMPackagesSyncer{Config: &c, DBStore: codeintelDb}, nil
+				return &server.JVMPackagesSyncer{Config: &c, DBStore: codeintelDB}, nil
 			}
 			return &server.GitRepoSyncer{}, nil
 		},

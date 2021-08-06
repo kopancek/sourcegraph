@@ -221,12 +221,10 @@ func Main(enterpriseInit EnterpriseInit) {
 					server.GitLabDotComSource, err = repos.NewGitLabSource(e, cf)
 				}
 			case *schema.JVMPackagesConnection:
-				var jvmPackageSource *repos.JVMPackagesSource
-				jvmPackageSource, err = repos.NewJVMPackagesSource(e)
-				if err != nil {
-					jvmPackageSource.SetDB(db)
+				server.JVMPackagesSource, err = repos.NewJVMPackagesSource(e)
+				if err == nil {
+					server.JVMPackagesSource.(*repos.JVMPackagesSource).SetDB(db)
 				}
-				server.JVMPackagesSource = jvmPackageSource
 			}
 
 			if err != nil {
