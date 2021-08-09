@@ -164,15 +164,11 @@ func (s *JVMPackagesSource) GetRepo(ctx context.Context, artifactPath string) (*
 			log15.Warn("error parsing maven module", "error", err, "module", dep.Module)
 			continue
 		}
-		fullDependencyString := reposource.MavenDependency{
+		dependency := reposource.MavenDependency{
 			MavenModule: parsedModule,
 			Version:     dep.Version,
-		}.CoursierSyntax()
-		parsed, err := reposource.ParseMavenDependency(fullDependencyString)
-		if err != nil {
-			continue
 		}
-		dependencies = append(dependencies, parsed)
+		dependencies = append(dependencies, dependency)
 	}
 
 	nonExistentDependencies := make([]reposource.MavenDependency, 0)

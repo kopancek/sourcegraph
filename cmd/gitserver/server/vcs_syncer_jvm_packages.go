@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Masterminds/semver"
 	"github.com/cockroachdb/errors"
 	"github.com/inconshreveable/log15"
 
@@ -193,16 +194,13 @@ func (s *JVMPackagesSyncer) packageDependencies(ctx context.Context, repoUrlPath
 			log15.Warn("error parsing maven module", "error", err, "module", dep.Module)
 			continue
 		}
-		fullDependencyString := reposource.MavenDependency{
-			MavenModule: parsedModule,
-			Version:     dep.Version,
-		}.CoursierSyntax()
-		if module.MatchesDependencyString(fullDependencyString) {
-			dependency, err := reposource.ParseMavenDependency(fullDependencyString)
-			if err != nil {
-				continue
+		if module == parsedModule {
+			semVersion, _ := semver.NewVersion(dep.Version)
+			dependency := reposource.MavenDependency{
+				MavenModule:     parsedModule,
+				Version:         dep.Version,
+				SemanticVersion: semVersion,
 			}
-
 			// we dont call coursier.Exists here, as existance should be verified by repo-updater
 			dependencies = append(dependencies, dependency)
 		}
