@@ -60,6 +60,15 @@ func runJobs(ctx context.Context, jobs []withContext) (err error) {
 	return g.Wait()
 }
 
+// repoSets returns the set of repositories to search (whether indexed or unindexed) based on search mode.
+func repoSets(indexed *zoektutil.IndexedSearchRequest, mode search.GlobalSearchMode) []repoData {
+	repoSets := []repoData{UnindexedList(indexed.Unindexed)} // unindexed included by default
+	if mode != search.SearcherOnly {
+		repoSets = append(repoSets, IndexedMap(indexed.Repos()))
+	}
+	return repoSets
+}
+
 // StructuralSearchFilesInRepos searches a set of repos for a structural pattern.
 func StructuralSearchFilesInRepos(ctx context.Context, args *search.TextParameters, stream streaming.Sender) (err error) {
 	ctx, stream, cleanup := streaming.WithLimit(ctx, stream, int(args.PatternInfo.FileMatchLimit))
@@ -71,12 +80,9 @@ func StructuralSearchFilesInRepos(ctx context.Context, args *search.TextParamete
 	}
 
 	jobs := []withContext{}
-	if args.Mode != search.SearcherOnly {
-		// Job for indexed repositories (fulfilled via searcher).
-		jobs = append(jobs, structuralSearchJob(args, stream, IndexedMap(indexed.Repos())))
+	for _, repoSet := range repoSets(indexed, args.Mode) {
+		jobs = append(jobs, structuralSearchJob(args, stream, repoSet))
 	}
-	// Job for unindexed repositories.
-	jobs = append(jobs, structuralSearchJob(args, stream, UnindexedList(indexed.Unindexed)))
 	return runJobs(ctx, jobs)
 }
 
