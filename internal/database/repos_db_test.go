@@ -1948,6 +1948,19 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 			want: repoNamesFromRepos(repos[1:]),
 		},
 		{
+			name: "only apply transformed wildcard ExternalRepoIncludePrefixes",
+			opt: ReposListOptions{
+				ExternalRepoIncludePrefixes: []api.ExternalRepoSpec{
+					{
+						ID:          "//%/Backend/",
+						ServiceType: extsvc.TypePerforce,
+						ServiceID:   "ssl:111.222.333.444:1666",
+					},
+				},
+			},
+			want: repoNamesFromRepos(repos[3:]),
+		},
+		{
 			name: "only apply ExternalRepoExcludePrefixes",
 			opt: ReposListOptions{
 				ExternalRepoExcludePrefixes: []api.ExternalRepoSpec{
@@ -1959,6 +1972,19 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 				},
 			},
 			want: repoNamesFromRepos(repos[:1]),
+		},
+		{
+			name: "only apply transformed wildcard ExternalRepoExcludePrefixes",
+			opt: ReposListOptions{
+				ExternalRepoExcludePrefixes: []api.ExternalRepoSpec{
+					{
+						ID:          "//%/Backend/",
+						ServiceType: extsvc.TypePerforce,
+						ServiceID:   "ssl:111.222.333.444:1666",
+					},
+				},
+			},
+			want: repoNamesFromRepos(repos[:3]),
 		},
 		{
 			name: "apply both ExternalRepoIncludePrefixes and ExternalRepoExcludePrefixes",
@@ -1973,6 +1999,26 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 				ExternalRepoExcludePrefixes: []api.ExternalRepoSpec{
 					{
 						ID:          "//Engineering/Backend/",
+						ServiceType: extsvc.TypePerforce,
+						ServiceID:   "ssl:111.222.333.444:1666",
+					},
+				},
+			},
+			want: repoNamesFromRepos(repos[1:3]),
+		},
+		{
+			name: "apply both ExternalRepoIncludePrefixes and transformed wildcard ExternalRepoExcludePrefixes",
+			opt: ReposListOptions{
+				ExternalRepoIncludePrefixes: []api.ExternalRepoSpec{
+					{
+						ID:          "//Engineering/",
+						ServiceType: extsvc.TypePerforce,
+						ServiceID:   "ssl:111.222.333.444:1666",
+					},
+				},
+				ExternalRepoExcludePrefixes: []api.ExternalRepoSpec{
+					{
+						ID:          "//%/Backend/",
 						ServiceType: extsvc.TypePerforce,
 						ServiceID:   "ssl:111.222.333.444:1666",
 					},
