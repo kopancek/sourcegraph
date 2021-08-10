@@ -219,8 +219,14 @@ func (p *Provider) FetchUserPerms(ctx context.Context, account *extsvc.Account) 
 		if len(fields) < 5 {
 			continue
 		}
-		level := fields[0]                               // e.g. read
-		depotPrefix := strings.TrimRight(fields[4], ".") // e.g. //Sourcegraph/
+		level := fields[0]      // e.g. read
+		depotMatch := fields[4] // e.g. //Sourcegraph/*
+
+		// Replace all wildcards syntax with '%' for PostgreSQL's LIKE
+		depotPrefix := strings.TrimRight(depotMatch, ".")
+		depotPrefix = strings.TrimRight(depotPrefix, "*")
+		depotPrefix = strings.ReplaceAll(depotPrefix, "*", "%")
+		depotPrefix = strings.ReplaceAll(depotPrefix, "...", "%")
 
 		// Rule that starts with a "-" in depot prefix means exclusion (i.e. revoke access)
 		if strings.HasPrefix(depotPrefix, "-") {
