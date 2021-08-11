@@ -204,12 +204,8 @@ func textSearchURLStream(ctx context.Context, url string, cb func([]*protocol.Fi
 		OnDone: func(e EventDone) {
 			ed = e
 		},
-		OnUnknown: func(event []byte, _ []byte) {
-			err = errors.Errorf("unknown event %q", event)
-		},
 	}
-	dec.ReadAll(resp.Body)
-	if err != nil {
+	if err := dec.ReadAll(resp.Body); err != nil {
 		return false, err
 	}
 	if ed.Error != "" {

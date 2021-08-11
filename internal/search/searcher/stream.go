@@ -14,7 +14,6 @@ import (
 type StreamDecoder struct {
 	OnMatches func([]*protocol.FileMatch)
 	OnDone    func(EventDone)
-	OnUnknown func(event, data []byte)
 }
 
 func (rr StreamDecoder) ReadAll(r io.Reader) error {
@@ -42,10 +41,7 @@ func (rr StreamDecoder) ReadAll(r io.Reader) error {
 			rr.OnDone(e)
 			break // done will always be the last event
 		} else {
-			if rr.OnUnknown == nil {
-				continue
-			}
-			rr.OnUnknown(event, data)
+			return errors.Errorf("unknown event %s", event)
 		}
 	}
 	return dec.Err()
