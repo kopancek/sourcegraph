@@ -2113,6 +2113,46 @@ func TestRepos_ListRepoNames_externalRepoContains(t *testing.T) {
 			},
 			want: filterRepoNames(repoNamesFromRepos(repos), "/Engineering", "/Engineering/Handbook/Backend"),
 		},
+		{
+			name: "apply both transformed '...' Perforce wildcard ExternalRepoIncludeContains and ExternalRepoExcludeContains",
+			opt: ReposListOptions{
+				ExternalRepoIncludeContains: []api.ExternalRepoSpec{
+					{
+						ID:          "//%/Backend/",
+						ServiceType: extsvc.TypePerforce,
+						ServiceID:   "ssl:111.222.333.444:1666",
+					},
+				},
+				ExternalRepoExcludeContains: []api.ExternalRepoSpec{
+					{
+						ID:          "//Engineering/Handbook/",
+						ServiceType: extsvc.TypePerforce,
+						ServiceID:   "ssl:111.222.333.444:1666",
+					},
+				},
+			},
+			want: filterRepoNames(repoNamesFromRepos(repos), "/Backend", "/Handbook"),
+		},
+		{
+			name: "apply both transformed '*' Perforce wildcard ExternalRepoIncludeContains and ExternalRepoExcludeContains",
+			opt: ReposListOptions{
+				ExternalRepoIncludeContains: []api.ExternalRepoSpec{
+					{
+						ID:          "//Engineering/[^/]+/Backend/",
+						ServiceType: extsvc.TypePerforce,
+						ServiceID:   "ssl:111.222.333.444:1666",
+					},
+				},
+				ExternalRepoExcludeContains: []api.ExternalRepoSpec{
+					{
+						ID:          "//Engineering/",
+						ServiceType: extsvc.TypePerforce,
+						ServiceID:   "ssl:111.222.333.444:1666",
+					},
+				},
+			},
+			want: nil,
+		},
 	}
 
 	for _, test := range tests {
