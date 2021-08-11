@@ -520,7 +520,6 @@
       "anyOf": [
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["type", "includeRepoRegexp", "excludeRepoRegexp"],
           "properties": {
             "type": {
@@ -532,7 +531,6 @@
         },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["type", "repositories"],
           "properties": {
             "type": {
