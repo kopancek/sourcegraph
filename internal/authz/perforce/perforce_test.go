@@ -162,7 +162,7 @@ review user alice * //Sourcegraph/.../Handbook/...
 					"//Sourcegraph/Engineering/Backend/",
 					"//Sourcegraph/Engineering/Frontend/",
 					"//Sourcegraph/Handbook/",
-					"//Sourcegraph/%/Handbook/",
+					"//Sourcegraph/[^/]+/Handbook/",
 					"//Sourcegraph/%/Handbook/",
 				},
 			},
@@ -178,7 +178,12 @@ review user alice * -//Sourcegraph/Handbook/...
 review user alice * -//Sourcegraph/*/Handbook/...
 review user alice * -//Sourcegraph/.../Handbook/...
 `,
-			wantPerms: &authz.ExternalUserPermissions{},
+			wantPerms: &authz.ExternalUserPermissions{
+				ExcludePrefixes: []extsvc.RepoID{
+					"//Sourcegraph/[^/]+/Handbook/",
+					"//Sourcegraph/%/Handbook/",
+				},
+			},
 		},
 		{
 			name: "include and exclude",
@@ -189,13 +194,13 @@ owner user alice * //Sourcegraph/Engineering/Backend/...
 open user alice * //Sourcegraph/Engineering/Frontend/...
 review user alice * //Sourcegraph/Handbook/...
 open user alice * //Sourcegraph/Engineering/.../Frontend/...
-review user alice * //Sourcegraph/*/Handbook/...
+open user alice * //Sourcegraph/.../Handbook/...  ## wildcard A
 
 list user alice * -//Sourcegraph/Security/...                        ## "list" can revoke read access
 =read user alice * -//Sourcegraph/Engineering/Frontend/...           ## exact match of a previous include
 open user alice * -//Sourcegraph/Engineering/Backend/Credentials/... ## sub-match of a previous include
-open user alice * -//Sourcegraph/Engineering/*/Frontend/Folder...    ## sub-match of previous include
-review user alice * -//Sourcegraph/.../Handbook/...                  ## nullify previous include
+open user alice * -//Sourcegraph/Engineering/*/Frontend/Folder/...   ## sub-match of a previous include
+open user alice * -//Sourcegraph/*/Handbook/...                      ## sub-match of wildcard A include
 `,
 			wantPerms: &authz.ExternalUserPermissions{
 				IncludePrefixes: []extsvc.RepoID{
@@ -204,11 +209,13 @@ review user alice * -//Sourcegraph/.../Handbook/...                  ## nullify 
 					"//Sourcegraph/Engineering/Frontend/",
 					"//Sourcegraph/Handbook/",
 					"//Sourcegraph/Engineering/%/Frontend/",
+					"//Sourcegraph/%/Handbook/",
 				},
 				ExcludePrefixes: []extsvc.RepoID{
 					"//Sourcegraph/Engineering/Frontend/",
 					"//Sourcegraph/Engineering/Backend/Credentials/",
-					"//Sourcegraph/Engineering/%/Frontend/Folder",
+					"//Sourcegraph/Engineering/[^/]+/Frontend/Folder/",
+					"//Sourcegraph/[^/]+/Handbook/",
 				},
 			},
 		},

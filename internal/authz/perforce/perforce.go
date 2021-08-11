@@ -222,11 +222,17 @@ func (p *Provider) FetchUserPerms(ctx context.Context, account *extsvc.Account) 
 		level := fields[0]      // e.g. read
 		depotMatch := fields[4] // e.g. //Sourcegraph/*
 
-		// Replace all wildcards syntax with '%' for PostgreSQL's LIKE
+		// '...' matches all files under the current working directory and all subdirectories.
+		// Matches anything, including slashes, and does so across subdirectories.
+		// Replace with '%' for PostgreSQL's LIKE and SIMILAR TO.
 		depotPrefix := strings.TrimRight(depotMatch, ".")
-		depotPrefix = strings.TrimRight(depotPrefix, "*")
-		depotPrefix = strings.ReplaceAll(depotPrefix, "*", "%")
 		depotPrefix = strings.ReplaceAll(depotPrefix, "...", "%")
+
+		// '*' matches all characters except slashes within one directory.
+		// Replace with character class that matches anything except another '/' supported
+		// by PostgreSQL's SIMILAR TO.
+		const wildcardRegex = "[^/]+"
+		depotPrefix = strings.ReplaceAll(depotPrefix, "*", wildcardRegex)
 
 		// Rule that starts with a "-" in depot prefix means exclusion (i.e. revoke access)
 		if strings.HasPrefix(depotPrefix, "-") {
@@ -236,20 +242,27 @@ func (p *Provider) FetchUserPerms(ctx context.Context, account *extsvc.Account) 
 				continue
 			}
 
-			for i, prefix := range includePrefixes {
-				if !strings.HasPrefix(depotPrefix, string(prefix)) {
-					continue
-				}
+			if strings.Contains(depotPrefix, "%") || strings.Contains(depotPrefix, wildcardRegex) {
+				// Always include wildcard matches, because we don't know what they might
+				// be matching on.
+				excludePrefixes = append(excludePrefixes, extsvc.RepoID(depotPrefix))
+			} else {
+				// Otherwise, only include an exclude if a corresponding include exists.
+				for i, prefix := range includePrefixes {
+					if !strings.HasPrefix(depotPrefix, string(prefix)) {
+						continue
+					}
 
-				// Perforce ACLs can have conflict rules and the later one wins. So if there is
-				// an exact match for an include prefix, we take it out.
-				if depotPrefix == string(prefix) {
-					includePrefixes = append(includePrefixes[:i], includePrefixes[i+1:]...)
+					// Perforce ACLs can have conflict rules and the later one wins. So if there is
+					// an exact match for an include prefix, we take it out.
+					if depotPrefix == string(prefix) {
+						includePrefixes = append(includePrefixes[:i], includePrefixes[i+1:]...)
+						break
+					}
+
+					excludePrefixes = append(excludePrefixes, extsvc.RepoID(depotPrefix))
 					break
 				}
-
-				excludePrefixes = append(excludePrefixes, extsvc.RepoID(depotPrefix))
-				break
 			}
 
 		} else {
