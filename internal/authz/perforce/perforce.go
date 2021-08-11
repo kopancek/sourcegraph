@@ -198,7 +198,7 @@ func (p *Provider) FetchUserPerms(ctx context.Context, account *extsvc.Account) 
 	}
 	defer func() { _ = rc.Close() }()
 
-	var includePrefixes, excludePrefixes []extsvc.RepoID
+	var includeContains, excludeContains []extsvc.RepoID
 	scanner := bufio.NewScanner(rc)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -245,10 +245,10 @@ func (p *Provider) FetchUserPerms(ctx context.Context, account *extsvc.Account) 
 			if strings.Contains(depotPrefix, "%") || strings.Contains(depotPrefix, wildcardRegex) {
 				// Always include wildcard matches, because we don't know what they might
 				// be matching on.
-				excludePrefixes = append(excludePrefixes, extsvc.RepoID(depotPrefix))
+				excludeContains = append(excludeContains, extsvc.RepoID(depotPrefix))
 			} else {
 				// Otherwise, only include an exclude if a corresponding include exists.
-				for i, prefix := range includePrefixes {
+				for i, prefix := range includeContains {
 					if !strings.HasPrefix(depotPrefix, string(prefix)) {
 						continue
 					}
@@ -256,11 +256,11 @@ func (p *Provider) FetchUserPerms(ctx context.Context, account *extsvc.Account) 
 					// Perforce ACLs can have conflict rules and the later one wins. So if there is
 					// an exact match for an include prefix, we take it out.
 					if depotPrefix == string(prefix) {
-						includePrefixes = append(includePrefixes[:i], includePrefixes[i+1:]...)
+						includeContains = append(includeContains[:i], includeContains[i+1:]...)
 						break
 					}
 
-					excludePrefixes = append(excludePrefixes, extsvc.RepoID(depotPrefix))
+					excludeContains = append(excludeContains, extsvc.RepoID(depotPrefix))
 					break
 				}
 			}
@@ -270,15 +270,15 @@ func (p *Provider) FetchUserPerms(ctx context.Context, account *extsvc.Account) 
 				continue
 			}
 
-			includePrefixes = append(includePrefixes, extsvc.RepoID(depotPrefix))
+			includeContains = append(includeContains, extsvc.RepoID(depotPrefix))
 		}
 	}
 
 	// As per interface definition for this method, implementation should return
 	// partial but valid results even when something went wrong.
 	return &authz.ExternalUserPermissions{
-		IncludePrefixes: includePrefixes,
-		ExcludePrefixes: excludePrefixes,
+		IncludeContains: includeContains,
+		ExcludeContains: excludeContains,
 	}, errors.Wrap(scanner.Err(), "scanner.Err")
 }
 

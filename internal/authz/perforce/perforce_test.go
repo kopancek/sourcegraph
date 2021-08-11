@@ -157,7 +157,7 @@ review user alice * //Sourcegraph/*/Handbook/...
 review user alice * //Sourcegraph/.../Handbook/...
 `,
 			wantPerms: &authz.ExternalUserPermissions{
-				IncludePrefixes: []extsvc.RepoID{
+				IncludeContains: []extsvc.RepoID{
 					"//Sourcegraph/Engineering/",
 					"//Sourcegraph/Engineering/Backend/",
 					"//Sourcegraph/Engineering/Frontend/",
@@ -179,7 +179,7 @@ review user alice * -//Sourcegraph/*/Handbook/...
 review user alice * -//Sourcegraph/.../Handbook/...
 `,
 			wantPerms: &authz.ExternalUserPermissions{
-				ExcludePrefixes: []extsvc.RepoID{
+				ExcludeContains: []extsvc.RepoID{
 					"//Sourcegraph/[^/]+/Handbook/",
 					"//Sourcegraph/%/Handbook/",
 				},
@@ -203,7 +203,7 @@ open user alice * -//Sourcegraph/Engineering/*/Frontend/Folder/...   ## sub-matc
 open user alice * -//Sourcegraph/*/Handbook/...                      ## sub-match of wildcard A include
 `,
 			wantPerms: &authz.ExternalUserPermissions{
-				IncludePrefixes: []extsvc.RepoID{
+				IncludeContains: []extsvc.RepoID{
 					"//Sourcegraph/Engineering/",
 					"//Sourcegraph/Engineering/Backend/",
 					"//Sourcegraph/Engineering/Frontend/",
@@ -211,7 +211,7 @@ open user alice * -//Sourcegraph/*/Handbook/...                      ## sub-matc
 					"//Sourcegraph/Engineering/%/Frontend/",
 					"//Sourcegraph/%/Handbook/",
 				},
-				ExcludePrefixes: []extsvc.RepoID{
+				ExcludeContains: []extsvc.RepoID{
 					"//Sourcegraph/Engineering/Frontend/",
 					"//Sourcegraph/Engineering/Backend/Credentials/",
 					"//Sourcegraph/Engineering/[^/]+/Frontend/Folder/",

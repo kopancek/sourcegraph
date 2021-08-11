@@ -408,8 +408,8 @@ func (s *PermsSyncer) syncUserPerms(ctx context.Context, userID int32, noPerms b
 				)
 			}
 		}
-		if len(extIDs.IncludePrefixes) > 0 {
-			for _, includePrefix := range extIDs.IncludePrefixes {
+		if len(extIDs.IncludeContains) > 0 {
+			for _, includePrefix := range extIDs.IncludeContains {
 				includePrefixSpecs = append(includePrefixSpecs,
 					api.ExternalRepoSpec{
 						ID:          string(includePrefix),
@@ -419,8 +419,8 @@ func (s *PermsSyncer) syncUserPerms(ctx context.Context, userID int32, noPerms b
 				)
 			}
 		}
-		if len(extIDs.ExcludePrefixes) > 0 {
-			for _, excludePrefix := range extIDs.ExcludePrefixes {
+		if len(extIDs.ExcludeContains) > 0 {
+			for _, excludePrefix := range extIDs.ExcludeContains {
 				excludePrefixSpecs = append(excludePrefixSpecs,
 					api.ExternalRepoSpec{
 						ID:          string(excludePrefix),
@@ -443,8 +443,8 @@ func (s *PermsSyncer) syncUserPerms(ctx context.Context, userID int32, noPerms b
 	if len(includePrefixSpecs) > 0 {
 		rs, err := s.reposStore.RepoStore.ListRepoNames(ctx,
 			database.ReposListOptions{
-				ExternalRepoIncludePrefixes: includePrefixSpecs,
-				ExternalRepoExcludePrefixes: excludePrefixSpecs,
+				ExternalRepoIncludeContains: includePrefixSpecs,
+				ExternalRepoExcludeContains: excludePrefixSpecs,
 				OnlyPrivate:                 true,
 			},
 		)

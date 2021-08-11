@@ -1873,9 +1873,9 @@ func TestRepos_ListRepoNames_externalServiceID(t *testing.T) {
 	}
 }
 
-// This function tests for both individual uses of ExternalRepoIncludePrefixes,
-// ExternalRepoExcludePrefixes as well as combination of these two options.
-func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
+// This function tests for both individual uses of ExternalRepoIncludeContains,
+// ExternalRepoExcludeContains as well as combination of these two options.
+func TestRepos_ListRepoNames_externalRepoContains(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
@@ -1969,9 +1969,9 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 		want []types.RepoName
 	}{
 		{
-			name: "only apply ExternalRepoIncludePrefixes",
+			name: "only apply ExternalRepoIncludeContains",
 			opt: ReposListOptions{
-				ExternalRepoIncludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoIncludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//Engineering/",
 						ServiceType: extsvc.TypePerforce,
@@ -1982,9 +1982,9 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 			want: repoNamesFromRepos(repos[1:]),
 		},
 		{
-			name: "only apply transformed '...' Perforce wildcard ExternalRepoIncludePrefixes",
+			name: "only apply transformed '...' Perforce wildcard ExternalRepoIncludeContains",
 			opt: ReposListOptions{
-				ExternalRepoIncludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoIncludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//%/Backend/",
 						ServiceType: extsvc.TypePerforce,
@@ -1995,9 +1995,9 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 			want: filterRepoNames(repoNamesFromRepos(repos), "/Backend", ""),
 		},
 		{
-			name: "only apply transformed '*' Perforce wildcard ExternalRepoIncludePrefixes",
+			name: "only apply transformed '*' Perforce wildcard ExternalRepoIncludeContains",
 			opt: ReposListOptions{
-				ExternalRepoIncludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoIncludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//[^/]+/[^/]+/Backend/",
 						ServiceType: extsvc.TypePerforce,
@@ -2009,9 +2009,9 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 			want: repoNamesFromRepos(repos[5:6]),
 		},
 		{
-			name: "only apply ExternalRepoExcludePrefixes",
+			name: "only apply ExternalRepoExcludeContains",
 			opt: ReposListOptions{
-				ExternalRepoExcludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoExcludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//Engineering/",
 						ServiceType: extsvc.TypePerforce,
@@ -2022,9 +2022,9 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 			want: repoNamesFromRepos(repos[:1]),
 		},
 		{
-			name: "only apply transformed '...' Perforce wildcard ExternalRepoExcludePrefixes",
+			name: "only apply transformed '...' Perforce wildcard ExternalRepoExcludeContains",
 			opt: ReposListOptions{
-				ExternalRepoExcludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoExcludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//%/Backend/",
 						ServiceType: extsvc.TypePerforce,
@@ -2035,9 +2035,9 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 			want: filterRepoNames(repoNamesFromRepos(repos), "", "/Backend"),
 		},
 		{
-			name: "only apply transformed '*' Perforce wildcard ExternalRepoExcludePrefixes",
+			name: "only apply transformed '*' Perforce wildcard ExternalRepoExcludeContains",
 			opt: ReposListOptions{
-				ExternalRepoExcludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoExcludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//[^/]+/[^/]+/Backend/",
 						ServiceType: extsvc.TypePerforce,
@@ -2049,16 +2049,16 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 			want: filterRepoNames(repoNamesFromRepos(repos), "", "/Handbook/Backend"),
 		},
 		{
-			name: "apply both ExternalRepoIncludePrefixes and ExternalRepoExcludePrefixes",
+			name: "apply both ExternalRepoIncludeContains and ExternalRepoExcludeContains",
 			opt: ReposListOptions{
-				ExternalRepoIncludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoIncludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//Engineering/",
 						ServiceType: extsvc.TypePerforce,
 						ServiceID:   "ssl:111.222.333.444:1666",
 					},
 				},
-				ExternalRepoExcludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoExcludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//Engineering/Backend/",
 						ServiceType: extsvc.TypePerforce,
@@ -2074,16 +2074,16 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 			want: repoNamesFromRepos(repos[1:3]),
 		},
 		{
-			name: "apply both ExternalRepoIncludePrefixes and transformed '...' Perforce wildcard ExternalRepoExcludePrefixes",
+			name: "apply both ExternalRepoIncludeContains and transformed '...' Perforce wildcard ExternalRepoExcludeContains",
 			opt: ReposListOptions{
-				ExternalRepoIncludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoIncludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//Engineering/",
 						ServiceType: extsvc.TypePerforce,
 						ServiceID:   "ssl:111.222.333.444:1666",
 					},
 				},
-				ExternalRepoExcludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoExcludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//%/Backend/",
 						ServiceType: extsvc.TypePerforce,
@@ -2094,16 +2094,16 @@ func TestRepos_ListRepoNames_externalRepoPrefixes(t *testing.T) {
 			want: filterRepoNames(repoNamesFromRepos(repos), "/Engineering", "/Backend"),
 		},
 		{
-			name: "apply both ExternalRepoIncludePrefixes and transformed '*' Perforce wildcard ExternalRepoExcludePrefixes",
+			name: "apply both ExternalRepoIncludeContains and transformed '*' Perforce wildcard ExternalRepoExcludeContains",
 			opt: ReposListOptions{
-				ExternalRepoIncludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoIncludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//Engineering/",
 						ServiceType: extsvc.TypePerforce,
 						ServiceID:   "ssl:111.222.333.444:1666",
 					},
 				},
-				ExternalRepoExcludePrefixes: []api.ExternalRepoSpec{
+				ExternalRepoExcludeContains: []api.ExternalRepoSpec{
 					{
 						ID:          "//Engineering/[^/]+/Backend/",
 						ServiceType: extsvc.TypePerforce,
