@@ -1,5 +1,4 @@
-// Package endpoint provides a consistent hash map for URLs to kubernetes
-// endpoints.
+// Package endpoint provides a consistent hash map over service endpoints.
 package endpoint
 
 import (
@@ -10,18 +9,18 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/cockroachdb/errors"
 	"github.com/inconshreveable/log15"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 )
 
 // Map is a consistent hash map to URLs. It uses the kubernetes API to watch
@@ -33,6 +32,8 @@ type Map struct {
 	err     error
 	urls    *hashMap
 	urlspec string
+	cli     *kubernetes.Clientset
+	ns      string
 }
 
 // New creates a new Map for the URL specifier.
@@ -50,7 +51,7 @@ type Map struct {
 // Examples URL specifiers:
 //
 // 	"k8s+http://searcher"
-// 	"http://searcher-1 http://searcher-2 http://searcher-3"
+// 	"http://searcher-0 http://searcher-1 http://searcher-2"
 //
 func New(urlspec string) *Map {
 	if !strings.HasPrefix(urlspec, "k8s+") {
@@ -70,26 +71,69 @@ func New(urlspec string) *Map {
 			return nil, err
 		}
 
-		client, ns, err := loadClient()
-		if err != nil {
-			return nil, err
-		}
-
-		endpoints, err := client.CoreV1().Endpoints(ns).Get(u.Service, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-
-		// Kick off watcher in the background
-		go func() {
-			for {
-				err := inform(client.CoreV1().Endpoints(ns), m, u)
-				log15.Debug("failed to watch kubernetes endpoint", "name", u.Service, "error", err)
-				time.Sleep(time.Second)
+		if m.cli == nil {
+			m.cli, m.ns, err = loadClient()
+			if err != nil {
+				return nil, err
 			}
-		}()
+		}
 
-		return endpointsToMap(u, *endpoints)
+		factory := informers.NewSharedInformerFactoryWithOptions(m.cli, 0,
+			informers.WithTweakListOptions(func(opts *metav1.ListOptions) {
+				opts.FieldSelector = "metadata.name=" + u.Service
+			}),
+		)
+
+		var informer cache.SharedIndexInformer
+		switch u.Kind {
+		case "sts", "statefulset":
+			informer = factory.Apps().V1().StatefulSets().Informer()
+		default:
+			informer = factory.Core().V1().Endpoints().Informer()
+		}
+
+		handle := func(op string, obj interface{}) {
+			var eps []string
+
+			switch o := (obj).(type) {
+			case *corev1.Endpoints:
+				for _, s := range o.Subsets {
+					addrs := append([]corev1.EndpointAddress(nil), s.Addresses...)
+					addrs = append(addrs, s.NotReadyAddresses...)
+
+					for _, a := range addrs {
+						ep := a.Hostname
+						if ep == "" {
+							ep = a.IP
+						}
+						eps = append(eps, ep)
+					}
+				}
+			case *appsv1.StatefulSet:
+				replicas := int32(1)
+				if o.Spec.Replicas != nil {
+					replicas = *o.Spec.Replicas
+				}
+				for i := int32(0); i < replicas; i++ {
+					eps = append(eps, fmt.Sprintf("%s-%d", o.Name, i))
+				}
+			}
+		}
+
+		informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+			},
+			UpdateFunc: func(_, obj interface{}) {
+			},
+		})
+
+		stopper := make(chan struct{})
+		defer close(stopper)
+
+		go informer.Run(stopper)
+
+		endpoints := []string{}
+		return endpointsToMap(u.Service, endpoints)
 	}
 
 	return m
@@ -174,71 +218,18 @@ func (m *Map) getUrls() (*hashMap, error) {
 	return urls, err
 }
 
-func inform(client v1.EndpointsInterface, m *Map, u *k8sURL) error {
-
-	// TODO(Dax): We shouldn't use watch directly, use an informer here
-	watcher, err := client.Watch(metav1.ListOptions{
-		FieldSelector: "metadata.name=" + u.Service,
-	})
-	if err != nil {
-		return errors.Wrap(err, "could not create watcher")
+func endpointsToMap(service string, eps []string) (*hashMap, error) {
+	sort.Strings(eps)
+	log15.Debug("kubernetes endpoints", "service", service, "endpoints", eps)
+	metricEndpointSize.WithLabelValues(service).Set(float64(len(eps)))
+	if len(eps) == 0 {
+		return nil, errors.Errorf(
+			"no %s endpoints could be found (this may indicate more %s replicas are needed, contact support@sourcegraph.com for assistance)",
+			service,
+			service,
+		)
 	}
-
-	defer watcher.Stop()
-
-	for {
-		event := <-watcher.ResultChan()
-		e := event.Object
-		endpoints, ok := e.(*corev1.Endpoints)
-		if !ok {
-			return errors.Wrap(err, "object from watcher is not an endpoint")
-		}
-
-		if event.Type == watch.Error {
-			return errors.Wrap(err, "watcher error")
-		}
-
-		if event.Type != watch.Added && event.Type != watch.Modified {
-			// Either we are error or the endpoint has been removed.
-			log15.Warn(`eventType is not "added" or "modified"`, "eventType", event.Type, "subsets", endpoints.Subsets)
-			endpoints.Subsets = nil
-		}
-		urls, err := endpointsToMap(u, *endpoints)
-		m.mu.Lock()
-		m.urls, m.err = urls, err
-		m.mu.Unlock()
-	}
-}
-
-func endpointsToMap(u *k8sURL, eps corev1.Endpoints) (*hashMap, error) {
-	var urls []string
-	add := func(addr *corev1.EndpointAddress) {
-		if addr.Hostname != "" {
-			urls = append(urls, u.endpointURL(addr.Hostname+"."+u.Service))
-		} else if addr.IP != "" {
-			urls = append(urls, u.endpointURL(addr.IP))
-		}
-	}
-
-	for _, subset := range eps.Subsets {
-		for _, addr := range subset.Addresses {
-			add(&addr)
-		}
-
-		if u.IncludeNotReady {
-			for _, addr := range subset.NotReadyAddresses {
-				add(&addr)
-			}
-		}
-	}
-
-	sort.Strings(urls)
-	log15.Debug("kubernetes endpoints", "service", u.Service, "urls", urls)
-	metricEndpointSize.WithLabelValues(u.Service).Set(float64(len(urls)))
-	if len(urls) == 0 {
-		return nil, errors.Errorf("no %s endpoints could be found (this may indicate more %s replicas are needed, contact support@sourcegraph.com for assistance)", u.Service, u.Service)
-	}
-	return newConsistentHashMap(urls), nil
+	return newConsistentHashMap(eps), nil
 }
 
 type k8sURL struct {
@@ -246,11 +237,7 @@ type k8sURL struct {
 
 	Service   string
 	Namespace string
-
-	// IncludeNotReady, if true, will make us include not ready endpoints. Defaults to false.
-	// This is desirable for sharded services like gitserver and indexed-search so that we
-	// don't shuffle things around during unavailability events.
-	IncludeNotReady bool
+	Kind      string
 }
 
 func (u *k8sURL) endpointURL(endpoint string) string {
@@ -271,6 +258,7 @@ func parseURL(rawurl string) (*k8sURL, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	parts := strings.Split(u.Hostname(), ".")
 	var svc, ns string
 	switch len(parts) {
@@ -279,13 +267,14 @@ func parseURL(rawurl string) (*k8sURL, error) {
 	case 2:
 		svc, ns = parts[0], parts[1]
 	default:
-		return nil, errors.Errorf("invalid k8s url. expected k8s+http://service.namespace:port/path, got %s", rawurl)
+		return nil, errors.Errorf("invalid k8s url. expected k8s+http://service.namespace:port/path?kind=$kind, got %s", rawurl)
 	}
+
 	return &k8sURL{
-		URL:             *u,
-		Service:         svc,
-		Namespace:       ns,
-		IncludeNotReady: u.Query().Get("include_not_ready") == "true",
+		URL:       *u,
+		Service:   svc,
+		Namespace: ns,
+		Kind:      strings.ToLower(u.Query().Get("kind")),
 	}, nil
 }
 
