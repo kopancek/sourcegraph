@@ -220,47 +220,53 @@ func (p *Provider) FetchUserPerms(ctx context.Context, account *extsvc.Account) 
 			continue
 		}
 		level := fields[0]      // e.g. read
-		depotMatch := fields[4] // e.g. //Sourcegraph/*
+		depotMatch := fields[4] // e.g. //Sourcegraph/*/dir/...
+
+		// NOTE: Manipulations made to `depotContains` will affect the behaviour of
+		// `(*RepoStore).ListRepoNames` - make sure to test new changes there as well.
+		depotContains := depotMatch
 
 		// '...' matches all files under the current working directory and all subdirectories.
 		// Matches anything, including slashes, and does so across subdirectories.
 		// Replace with '%' for PostgreSQL's LIKE and SIMILAR TO.
-		depotPrefix := strings.TrimRight(depotMatch, ".")
-		depotPrefix = strings.ReplaceAll(depotPrefix, "...", "%")
+		depotContains = strings.TrimRight(depotContains, ".") // drop trailing, treat everything as a prefix
+		const wildcardMatchAll = "%"
+		depotContains = strings.ReplaceAll(depotContains, "...", wildcardMatchAll)
 
 		// '*' matches all characters except slashes within one directory.
 		// Replace with character class that matches anything except another '/' supported
 		// by PostgreSQL's SIMILAR TO.
-		const wildcardRegex = "[^/]+"
-		depotPrefix = strings.ReplaceAll(depotPrefix, "*", wildcardRegex)
+		const wildcardMatchDirectory = "[^/]+"
+		depotContains = strings.ReplaceAll(depotContains, "*", wildcardMatchDirectory)
 
 		// Rule that starts with a "-" in depot prefix means exclusion (i.e. revoke access)
-		if strings.HasPrefix(depotPrefix, "-") {
-			depotPrefix = depotPrefix[1:]
+		if strings.HasPrefix(depotContains, "-") {
+			depotContains = depotContains[1:]
 
 			if !p.canRevokeReadAccess(level) {
 				continue
 			}
 
-			if strings.Contains(depotPrefix, "%") || strings.Contains(depotPrefix, wildcardRegex) {
+			if strings.Contains(depotContains, wildcardMatchAll) ||
+				strings.Contains(depotContains, wildcardMatchDirectory) {
 				// Always include wildcard matches, because we don't know what they might
 				// be matching on.
-				excludeContains = append(excludeContains, extsvc.RepoID(depotPrefix))
+				excludeContains = append(excludeContains, extsvc.RepoID(depotContains))
 			} else {
 				// Otherwise, only include an exclude if a corresponding include exists.
 				for i, prefix := range includeContains {
-					if !strings.HasPrefix(depotPrefix, string(prefix)) {
+					if !strings.HasPrefix(depotContains, string(prefix)) {
 						continue
 					}
 
 					// Perforce ACLs can have conflict rules and the later one wins. So if there is
 					// an exact match for an include prefix, we take it out.
-					if depotPrefix == string(prefix) {
+					if depotContains == string(prefix) {
 						includeContains = append(includeContains[:i], includeContains[i+1:]...)
 						break
 					}
 
-					excludeContains = append(excludeContains, extsvc.RepoID(depotPrefix))
+					excludeContains = append(excludeContains, extsvc.RepoID(depotContains))
 					break
 				}
 			}
@@ -270,7 +276,7 @@ func (p *Provider) FetchUserPerms(ctx context.Context, account *extsvc.Account) 
 				continue
 			}
 
-			includeContains = append(includeContains, extsvc.RepoID(depotPrefix))
+			includeContains = append(includeContains, extsvc.RepoID(depotContains))
 		}
 	}
 
@@ -444,13 +450,13 @@ func (p *Provider) scanAllUsers(ctx context.Context, rc io.ReadCloser) (map[stri
 		if len(fields) < 5 {
 			continue
 		}
-		level := fields[0]                               // e.g. read
-		typ := fields[1]                                 // e.g. user
-		name := fields[2]                                // e.g. alice
-		depotPrefix := strings.TrimRight(fields[4], ".") // e.g. //Sourcegraph/
+		level := fields[0]                              // e.g. read
+		typ := fields[1]                                // e.g. user
+		name := fields[2]                               // e.g. alice
+		depotMatch := strings.TrimRight(fields[4], ".") // e.g. //Sourcegraph/
 
-		// Rule that starts with a "-" in depot prefix means exclusion (i.e. revoke access)
-		if strings.HasPrefix(depotPrefix, "-") {
+		// Rule that starts with a "-" in depot match means exclusion (i.e. revoke access)
+		if strings.HasPrefix(depotMatch, "-") {
 			if !p.canRevokeReadAccess(level) {
 				continue
 			}

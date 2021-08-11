@@ -541,11 +541,11 @@ type ReposListOptions struct {
 	ExternalRepos []api.ExternalRepoSpec
 
 	// ExternalRepoIncludeContains is the list of specs to include repos using
-	// prefix matching. When zero-valued, this is omitted from the predicate set.
+	// SIMILAR TO matching. When zero-valued, this is omitted from the predicate set.
 	ExternalRepoIncludeContains []api.ExternalRepoSpec
 
 	// ExternalRepoExcludeContains is the list of specs to exclude repos using
-	// prefix matching. When zero-valued, this is omitted from the predicate set.
+	// SIMILAR TO matching. When zero-valued, this is omitted from the predicate set.
 	ExternalRepoExcludeContains []api.ExternalRepoSpec
 
 	// PatternQuery is an expression tree of patterns to query. The atoms of
