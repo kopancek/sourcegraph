@@ -1,0 +1,43 @@
+# EXPERIMENTAL: Extends the query API with an endpoint that computes values from search results.
+extend type Query {
+    compute(
+        """
+        The search query
+        """
+        query: String = ""
+    ): [ComputeResult!]!
+}
+
+"""
+A compute operation result.
+"""
+union ComputeResult = ComputeMatchContext | ComputeText
+
+"""
+The result of matching data that satisfy a search pattern, including an environment of submatches.
+"""
+type ComputeMatchContext {
+     resource: GitBlob!
+     matches: [ComputeMatch]!
+}
+
+type ComputeMatch {
+     value: String!
+     range: Range!
+     environment: [ComputeEnvironmentEntry]!
+}
+
+type ComputeEnvironmentEntry {
+     variable: String!
+     value: String!
+     range: Range!
+}
+
+"""
+A general computed result for arbitrary textual data. A result optionally specifies a related resource and the kind of textual data.
+"""
+type ComputeText {
+     resource: GitBlob
+     kind: String
+     value: String!
+}
